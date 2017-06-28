@@ -106,7 +106,7 @@ def make_pat_data(data_dir ='/storage/gabriel/VC/Normal_Images/' ,dest_dir ='/st
         #pass
     
     #list containing patient number
-    pat_num = []
+    pat_num1 = []
     count=0
     all_im_name = []
     all_im_dir = []
@@ -119,19 +119,19 @@ def make_pat_data(data_dir ='/storage/gabriel/VC/Normal_Images/' ,dest_dir ='/st
                 all_im_dir.append(i+'/'+l)
                 temp = l.find('EQo_')+4
                 temp2 = l[temp:].find('_')+temp
-                if(l[temp:temp2] not in pat_num):
+                if(int(l[temp:temp2]) not in pat_num1):
 
-                    pat_num.append(l[temp:temp2])
+                    pat_num1.append(int(l[temp:temp2]))
 
-    
-    
     #dictionary of form { patient number : number of frames }
     def find_last_two(s):
         return [k for k,q in enumerate(s) if q=='_'][:2]    
     
     num_class = {i:len(os.listdir(data_dir+i)) for i in os.listdir(data_dir) if '.ipynb' not in i}
-    
-    
+    #print(pat_num1)
+    pat_num = np.random.permutation(pat_num1)
+    print(pat_num)
+    #return
     train_pat = [int(i) for i in pat_num[:len(pat_num)*6//10]]
     test_pat = [int(i) for i in pat_num[len(pat_num)*6//10:len(pat_num)*8//10]]
     valid_pat = [int(i) for i in pat_num[len(pat_num)*8//10:]]
