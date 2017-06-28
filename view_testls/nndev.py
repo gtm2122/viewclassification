@@ -172,8 +172,8 @@ class model_pip(object):
             else:
                 print('here')
                 data_transforms = {
-                'test':transforms.Compose([transforms.Scale(350),
-                transforms.RandomCrop(300),
+                'test':transforms.Compose([transforms.Scale(300),
+                transforms.RandomCrop(350),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
                                                  
