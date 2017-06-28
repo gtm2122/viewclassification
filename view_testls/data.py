@@ -133,8 +133,8 @@ def make_pat_data(data_dir ='/storage/gabriel/VC/Normal_Images/' ,dest_dir ='/st
     print(pat_num)
     #return
     train_pat = [int(i) for i in pat_num[:len(pat_num)*6//10]]
-    test_pat = [int(i) for i in pat_num[len(pat_num)*6//10:len(pat_num)*8//10]]
-    valid_pat = [int(i) for i in pat_num[len(pat_num)*8//10:]]
+    test_pat = [int(i) for i in pat_num[1+ len(pat_num)*6//10:len(pat_num)*8//10]]
+    valid_pat = [int(i) for i in pat_num[1+ len(pat_num)*8//10:]]
     
     table = {'train':train_pat,'test':test_pat,'val':valid_pat}
     
