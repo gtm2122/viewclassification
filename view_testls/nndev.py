@@ -85,11 +85,8 @@ class model_pip(object):
                 print('here')
                 data_transforms = {
                 'test':transforms.Compose([transforms.Scale(300),
-<<<<<<< HEAD
-                transforms.RandomCrop(350),
-=======
                 transforms.RandomCrop(300),
->>>>>>> 4f62394a7db9fd05b679340d2530ed236f4b3e53
+
                 transforms.ToTensor(),
                 transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
                                                  
