@@ -13,13 +13,12 @@ import torch.optim as optim
 import copy
 from os import path
 import skimage.io as io
-from scipy.misc import imsave
 from skimage import img_as_uint
 import errno 
 import numpy as np
 import random
 import gc
-
+import scipy.misc as misc
 
 import torch
 import numpy as np
@@ -34,93 +33,6 @@ import shutil
 import os
 
 #shutil.mkdir('/storage/Normal_Images/')
-def sample_data(path = '/storage/gabriel/VC/Normal_Images/',eq = False):
-    data_dic = {}
-    #test_arr = [i for i in os.listdir(path) if len(i)>2]
-    #print(test_arr)
-    len_arr = np.array([len(os.listdir(path+i)) for i in os.listdir(path) if '.ipynb' not in i])
-    target_name = [i for i in os.listdir(path)]
-    if(eq):
-        print(len_arr)
-        
-        base_num = min(len_arr)
-        train_ind = np.random.choice(base_num,base_num*7//10,replace=False)
-        left_out_ind = np.array([i for i in np.arange(0,base_num) if i not in train_ind])
-        val_ind = np.random.choice(left_out_ind,base_num//5,replace=False)
-        test_ind = np.array([i for i in left_out_ind if i not in val_ind])
-
-        data_dic_ind = {'train' : train_ind,'val' : val_ind, 'test' : test_ind}
-
-        for i in data_dic_ind.keys():
-            try:
-                os.makedirs('/storage/gabriel/VC/dataset/'+i)
-                for j in target_name:
-                    os.makedirs('/storage/gabriel/VC/dataset/'+i+'/'+j)
-                
-            except:
-                pass
-        for i in os.listdir(path):
-            count = 0
-            #print(i)
-            
-            if('.ipynb' not in i):
-                for j in os.listdir(path+i):
-
-
-                    #print(j)
-                    print(path+'/'+i+'/'+j)
-                    #return
-                    if(count in data_dic_ind['train']):
-                        src = path+'/'+i+'/'+j
-                        dst = '/storage/gabriel/VC/dataset/'+'train/'+i
-                        #!cp $path/$i/$j /storage/gabriel/VC/dataset/train/$i/
-                        shutil.copy(path+'/'+i+'/'+j,'/storage/gabriel/VC/dataset/'+'train/'+i)
-
-                    if(count in data_dic_ind['test']):
-                        #!cp $path/$i/$j /storage/gabriel/VC/dataset/train/$i/
-                        shutil.copy(path+'/'+i+'/'+j,'/storage/gabriel/VC/dataset/'+'test/'+i)
-
-                    if(count in data_dic_ind['val']):
-
-                        #!cp $path/$i/$j /storage/gabriel/VC/dataset/train/$i/
-                        shutil.copy(path+'/'+i+'/'+j,'/storage/gabriel/VC/dataset/'+'val/'+i)
-                    count+=1
-
-    else:
-        c_count=0
-        for p in target_name:
-
-            base_num = len(os.listdir(path+p))
-            train_ind = np.random.choice(base_num,base_num*7//10,replace=False)
-            left_out_ind = np.array([i for i in np.arange(0,base_num) if i not in train_ind])
-            val_ind = np.random.choice(left_out_ind,base_num//5,replace=False)
-            test_ind = np.array([i for i in left_out_ind if i not in val_ind])
-            
-            data_dic_ind = {'train' : train_ind,'val' : val_ind, 'test' : test_ind}
-            for i in data_dic_ind.keys():
-                try:
-                    os.makedirs('/storage/gabriel/VC/dataset/'+i)
-                    for j in target_name:
-                        os.makedirs('/storage/gabriel/VC/dataset/'+i+'/'+j)
-       
-                except:
-                    pass
-
-            for i in os.listdir(path):
-                count = 0
-                for j in os.listdir(path+i):
-                    if(count in data_dic_ind['train']):
-                        shutil.copy(path+'/'+i+'/'+j,'/storage/gabriel/VC/dataset/'+'train/'+i+'/'+j)
-
-                    if(count in data_dic_ind['test']):
-                        shutil.copy(path+'/'+i+'/'+j,'/storage/gabriel/VC/dataset/'+'test/'+i+'/'+j)
-
-                    if(count in data_dic_ind['val']):
-                        shutil.copy(path+'/'+i+'/'+j,'/storage/gabriel/VC/dataset/'+'val/'+i+'/'+j)
-                    count+=1
-
-
-
 
 class model_pip(object):
 
@@ -146,8 +58,8 @@ class model_pip(object):
         self.resume = resume
         ### TODO , correct below code, this is not optimal
         self.num_output = len(os.listdir(data_path+'test/'))
-        torch.manual_seed(1)
-        torch.cuda.manual_seed(1)
+        #torch.manual_seed(1)
+        #torch.cuda.manual_seed(1)
     def transform(self,rand = False,test_only = False):
         
         if(test_only):
@@ -172,7 +84,7 @@ class model_pip(object):
             else:
                 print('here')
                 data_transforms = {
-                'test':transforms.Compose([transforms.Scale(350),
+                'test':transforms.Compose([transforms.Scale(300),
                 transforms.RandomCrop(300),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
@@ -438,12 +350,13 @@ class model_pip(object):
                           'optimizer':self.model_optimizer.state_dict()}
         torch.save(state,f_name)
     
-    def test(self,model_dir,test_on,n):
+    def test(self,model_dir,model_name,random_crop,test_on,n='None',save_miscl = False):
         #TODO modify class to add a test path
         self.model.eval()
         epoch_acc = 0
-        dsets,dset_loaders,dset_sizes = self.transform(rand=True,test_only=test_on)
+        dsets,dset_loaders,dset_sizes = self.transform(rand=random_crop,test_only=test_on)
         flag=False
+        model_ind = model_name[:model_dir.find('.pth.tar')]
         if(torch.cuda.is_available() and self.use_gpu):
             flag=True
         if(flag):
@@ -451,14 +364,14 @@ class model_pip(object):
             self.model.cuda()
         running_corrects = 0  
         c_mat = np.zeros((self.num_output,self.num_output))
-        print(c_mat.shape)
+        #print(c_mat.shape)
         for data in dset_loaders['test']:
-            inp,labels = data
+            inp_img,labels = data
              
             if(flag):
-                inp,labels=inp.cuda(),labels.cuda()
+                inp_img,labels=inp_img.cuda(),labels.cuda()
         
-            inp,labels=Variable(inp),Variable(labels)
+            inp,labels=Variable(inp_img),Variable(labels)
             
             if(inp.size(0)<self.b_size and  n == 'Inception'):
                 #flag=1
@@ -494,6 +407,36 @@ class model_pip(object):
                 #print(output.data.size())
                 #print(labels.data)
             running_corrects += torch.sum(preds == labels.data)
+            
+            ### save misclassified ones
+            #print(preds.cpu().numpy().shape)
+            #print(preds.cpu().numpy().reshape(self.b_size,))
+            #print(labels.data.cpu().numpy().reshape(self.b_size,))
+            #print(preds.cpu().numpy().reshape(self.b_size,) == labels.data.cpu().numpy().reshape(self.b_size,))
+            
+            pred_np = preds.cpu().numpy()
+            
+            label_np = labels.cpu().data.numpy().reshape(pred_np.shape[0],1)
+            #print(pred_np.shape)
+            #print(label_np.shape)
+            misc_arr = pred_np==label_np
+            #print(misc)
+            #print(misc.shape)
+            misc_ind = [i for i in range(0,pred_np.shape[0]) if misc_arr[i] == False]
+            #print(misc_ind)
+            #print(misc_ind[0])
+            #misc_ind = np.where(np.array((preds.cpu().numpy().reshape(self.b_size,)==labels.data.cpu().numpy().reshape(self.b_size,)))==False)[0]
+            #print(misc_ind)
+            #print(preds.cpu().numpy()==labels.data.cpu().numpy())
+            #return
+            for i in misc_ind:
+                #print(preds[i])
+                #print(labels.data[i])
+                misc_img = inp_img.cpu()[i].numpy().transpose(1,2,0)*np.array([0.229,0.224,0.225]) +np.array([0.485,0.456,0.406])
+                count_file = len(os.listdir(model_dir+'/misc/'))
+                #plt.imshow(misc_img),plt.show()
+                misc.imsave(model_dir+'/misc/'+str(count_file+1)+'_'+str(label_np[i])+'_as_'+str(pred_np[i])+'.jpg',misc_img)
+            
             #print(torch.sum(preds==labels.data))
             for i in range(0,labels.data.cpu().numpy().shape[0]):
 
@@ -503,7 +446,7 @@ class model_pip(object):
         print(c_mat)
        
             
-        #np.savetxt(model_dir+'/c_mat.txt',c_mat.astype(int))
-        #np.savetxt(model_dir+'/accuracy.txt',np.array(epoch_acc).reshape(1,))
+        np.savetxt(model_dir+'/'+model_ind+'c_mat.txt',c_mat.astype(int))
+        np.savetxt(model_dir+'/'+model_ind+'accuracy.txt',np.array(epoch_acc).reshape(1,))
             
             
