@@ -331,7 +331,7 @@ class model_pip(object):
                     #del(inp)
                     #del(label)
                 #print()
-
+        
         print(best_acc)
         print(best_epoch)
             
@@ -344,10 +344,16 @@ class model_pip(object):
                           'optimizer':self.model_optimizer.state_dict()}
         torch.save(state,f_name)
     
-    def test(self,model_dir,model_name,random_crop,test_on,n='None',save_miscl = False):
+    def test(self,model_dir,model_name,random_crop,test_on,n='None',save_miscl = False,folder = 'misc'):
         #TODO modify class to add a test path
         self.model.eval()
         epoch_acc = 0
+        try:
+            shutil.rmtree(model_dir+'/'+folder+'/'+model_name[:model_name.find('.pth.tar')])
+            os.makedirs(model_dir+'/'+folder+'/'+model_name[:model_name.find('.pth.tar')])
+        except:
+            os.makedirs(model_dir+'/'+folder+'/'+model_name[:model_name.find('.pth.tar')])
+            
         dsets,dset_loaders,dset_sizes = self.transform(rand=random_crop,test_only=test_on)
         flag=False
         model_ind = model_name[:model_dir.find('.pth.tar')]
@@ -427,9 +433,9 @@ class model_pip(object):
                 #print(preds[i])
                 #print(labels.data[i])
                 misc_img = inp_img.cpu()[i].numpy().transpose(1,2,0)*np.array([0.229,0.224,0.225]) +np.array([0.485,0.456,0.406])
-                count_file = len(os.listdir(model_dir+'/misc/'))
+                count_file = len(os.listdir(model_dir+'/'+folder+'/'+model_name[:model_name.find('.pth.tar')]))
                 #plt.imshow(misc_img),plt.show()
-                misc.imsave(model_dir+'/misc/'+str(count_file+1)+'_'+str(label_np[i])+'_as_'+str(pred_np[i])+'.jpg',misc_img)
+                misc.imsave(model_dir+'/'+folder+'/'+model_name[:model_name.find('.pth.tar')]+'/'+str(count_file+1)+'_'+str(label_np[i])+'_as_'+str(pred_np[i])+'.jpg',misc_img)
             for i in range(0,labels.data.cpu().numpy().shape[0]):
 
                 c_mat[labels.data.cpu().numpy()[i],preds.cpu().numpy()[i]]+=1
@@ -437,12 +443,12 @@ class model_pip(object):
             del(inp_img)
             del(inp)
             del(labels)
-
-        print('test accuracy= ',(c_mat[0,0]+c_mat[1,1]+c_mat[2,2])/np.sum(c_mat) )
+        t_acc = np.trace(c_mat)/np.sum(c_mat)
+        print('test accuracy= ',t_acc)
         print(c_mat)
        
             
-        np.savetxt(model_dir+'/'+model_ind+'c_mat.txt',c_mat.astype(int))
-        np.savetxt(model_dir+'/'+model_ind+'accuracy.txt',np.array(epoch_acc).reshape(1,))
+        np.savetxt(model_dir+'/'+folder+'/'+model_name[:model_name.find('.pth.tar')]+'/'+model_name+'c_mat.txt',c_mat.astype(int))
+        np.savetxt(model_dir+'/'+folder+'/'+model_name[:model_name.find('.pth.tar')]+'/'+model_name+'accuracy.txt',np.array(t_acc).reshape(1,))
             
             
