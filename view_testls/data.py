@@ -130,12 +130,14 @@ def make_pat_data(data_dir ='/storage/gabriel/VC/Normal_Images/' ,dest_dir ='/st
     num_class = {i:len(os.listdir(data_dir+i)) for i in os.listdir(data_dir) if '.ipynb' not in i}
     #print(pat_num1)
     pat_num = np.random.permutation(pat_num1)
-    print(pat_num)
+    #print(pat_num)
     #return
     train_pat = [int(i) for i in pat_num[:len(pat_num)*6//10]]
+    print('train  ',train_pat)
     test_pat = [int(i) for i in pat_num[1+ len(pat_num)*6//10:len(pat_num)*8//10]]
+    print('test  ',test_pat)
     valid_pat = [int(i) for i in pat_num[1+ len(pat_num)*8//10:]]
-    
+    print('valid  ',valid_pat)
     table = {'train':train_pat,'test':test_pat,'val':valid_pat}
     
     for fol in ['train','val','test']:

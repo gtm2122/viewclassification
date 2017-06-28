@@ -37,10 +37,9 @@ import os
 class model_pip(object):
 
     def __init__(self,model_in,data_path = '/data/gabriel/OCR/OCR_data/',
-                 model_saved = './models/1.pth.tar',
                  batch_size=90,lr = 0.001, 
                  gpu=0,f_extractor = False,scale = False,op=optim.SGD,
-                 criterion=nn.CrossEntropyLoss(),use_gpu=True,lr_decay_epoch=7,resume=False,rand=False):
+                 criterion=nn.CrossEntropyLoss(),use_gpu=True,lr_decay_epoch=7,resume=False,rand=False,model_path_continue=None):
         self.rand=rand
         self.epochs = 0
         self.lr_decay_epoch=lr_decay_epoch
@@ -54,8 +53,9 @@ class model_pip(object):
         self.gpu=gpu
         self.use_gpu=use_gpu
         self.model_optimizer = op(model_in.parameters(),lr = self.lr,momentum=0.9)
-        self.model_saved = model_saved
+        
         self.resume = resume
+        self.model_path_continue=model_path_continue
         ### TODO , correct below code, this is not optimal
         self.num_output = len(os.listdir(data_path+'test/'))
         #torch.manual_seed(1)
@@ -202,17 +202,6 @@ class model_pip(object):
             param_group['lr'] = lr
         #return optimz
     
-    #@staticmethod
-    def imshow(inp,title=None):
-        inp=inp.numpy().transpose((1,2,0))
-        mean=np.array([0.485,0.456,0.406])
-        std = np.array([0.229,0.224,0.225])
-        inp = std*inp + mean
-        plt.imshow(inp),plt.show()
-        plt.pause(0.01)
-    
-    
-  
     def load_model(self,filename):
         checkpoint = torch.load(filename)
         start_epoch = checkpoint['epochs']
@@ -228,14 +217,14 @@ class model_pip(object):
         #op = self.model_optimizer
         epoch_init = 0
         
-        '''
+        
         if(self.resume):
             
             try:
-                self.load_model()
+                self.load_model(filename=self.model_path_continue)
             except:
                 print('invalid directory, starting from scratch')
-        '''
+        
         
         best_model=model
         
@@ -290,11 +279,11 @@ class model_pip(object):
                                              
                             temp[0:inputs.size(0)]=inputs
                             inputs = temp
-                            
+                            del(temp)
                             temp2[0:labels.size(0)] = labels
                             temp2[labels.size(0):] = 0
                             labels = temp2
-                        
+                            del(temp2)
                         outputs = model(inputs)
                         #print(outputs.size())
                         #print(labels.size())
@@ -323,19 +312,23 @@ class model_pip(object):
 
                             c_mat[labels.data.cpu().numpy()[i],preds.cpu().numpy()[i]]+=1
 
-                        self.epochs = epoch 
+                        self.epochs = epoch
+                        del(inputs)
+                        del(labels)
+                        del(outputs)
                     epoch_loss = running_loss/dset_sizes[phase]
                     epoch_acc = running_corrects/dset_sizes[phase]
                     #epoch_tpr = running_tp/dset_sizes[phase]
                     
-                    print(phase + '{} Loss: {:.4f} Acc: {:.4f}'.format(phase,epoch_loss,epoch_acc))
+                    print(phase + '{} Loss: {:.10f} \nAcc: {:.4f}'.format(phase,epoch_loss,epoch_acc))
                     #print(c_mat)
                     print(c_mat)
                     if phase=='val' and epoch_acc>best_acc:
                         best_acc=epoch_acc
                         best_model=copy.deepcopy(model)
                         best_epoch=epoch
-
+                    #del(inp)
+                    #del(label)
                 #print()
 
         print(best_acc)
@@ -436,12 +429,14 @@ class model_pip(object):
                 count_file = len(os.listdir(model_dir+'/misc/'))
                 #plt.imshow(misc_img),plt.show()
                 misc.imsave(model_dir+'/misc/'+str(count_file+1)+'_'+str(label_np[i])+'_as_'+str(pred_np[i])+'.jpg',misc_img)
-            
-            #print(torch.sum(preds==labels.data))
             for i in range(0,labels.data.cpu().numpy().shape[0]):
 
                 c_mat[labels.data.cpu().numpy()[i],preds.cpu().numpy()[i]]+=1
             #epoch_acc += running_corrects/dset_sizes['test']
+            del(inp_img)
+            del(inp)
+            del(labels)
+
         print('test accuracy= ',(c_mat[0,0]+c_mat[1,1]+c_mat[2,2])/np.sum(c_mat) )
         print(c_mat)
        
