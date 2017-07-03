@@ -206,7 +206,8 @@ class model_pip(object):
         checkpoint = torch.load(filename)
         start_epoch = checkpoint['epochs']
         self.model.load_state_dict(checkpoint['state_dict'])
-        self.model_optimizer.load_state_dict(checkpoint['optimizer'])
+        if(self.resume):
+            self.model_optimizer.load_state_dict(checkpoint['optimizer'])
         #return model,optimz,start_epoch
     
     def train_model(self, epochs=30,n=None):
