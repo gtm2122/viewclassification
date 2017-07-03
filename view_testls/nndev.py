@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import  torch.utils.data as data_utils
 import torch
 import torch.nn as nn
-from torchvision.models import inception
-from torchvision.models import Inception3
+#from torchvision.models import inception
+#from torchvision.models import Inception3
 import numpy as np
 from torch.autograd import Variable
 import torch.nn.functional as F
@@ -86,6 +86,7 @@ class model_pip(object):
                 data_transforms = {
                 'test':transforms.Compose([transforms.Scale(300),
                 transforms.RandomCrop(300),
+
                 transforms.ToTensor(),
                 transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
                                                  
