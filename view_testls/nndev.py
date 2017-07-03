@@ -39,7 +39,8 @@ class model_pip(object):
     def __init__(self,model_in,data_path = '/data/gabriel/OCR/OCR_data/',
                  batch_size=90,lr = 0.001, 
                  gpu=0,f_extractor = False,scale = False,op=optim.SGD,
-                 criterion=nn.CrossEntropyLoss(),use_gpu=True,lr_decay_epoch=7,resume=False,rand=False,model_path_continue=None):
+               criterion=nn.CrossEntropyLoss(),use_gpu=True,lr_decay_epoch=7,
+                 resume=False,rand=False,model_path_continue=None,verbose=True):
         self.rand=rand
         self.epochs = 0
         self.lr_decay_epoch=lr_decay_epoch
@@ -53,7 +54,7 @@ class model_pip(object):
         self.gpu=gpu
         self.use_gpu=use_gpu
         self.model_optimizer = op(model_in.parameters(),lr = self.lr,momentum=0.9)
-        
+        self.verbose = verbose
         self.resume = resume
         self.model_path_continue=model_path_continue
         ### TODO , correct below code, this is not optimal
@@ -132,7 +133,7 @@ class model_pip(object):
                 }
             
             else:
-                print('here')
+                #print('here')
                 data_transforms = {'train':transforms.Compose([transforms.Scale(300),
                                             transforms.CenterCrop(300),
                                                #transforms.RandomHorizontalFlip(),
@@ -154,7 +155,7 @@ class model_pip(object):
  
                 }
         if(self.scale==False and not(test_only)):
-            print('here2')
+            #print('here2')
             data_transforms = {'train':transforms.Compose([transforms.Scale(300),transforms.CenterCrop(300),
                                               transforms.ToTensor(),
                                               transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
@@ -321,10 +322,11 @@ class model_pip(object):
                     epoch_loss = running_loss/dset_sizes[phase]
                     epoch_acc = running_corrects/dset_sizes[phase]
                     #epoch_tpr = running_tp/dset_sizes[phase]
-                    
                     print(phase + '{} Loss: {:.10f} \nAcc: {:.4f}'.format(phase,epoch_loss,epoch_acc))
                     #print(c_mat)
-                    print(c_mat)
+                    if(self.verbose):
+                    
+                        print(c_mat)
                     if phase=='val' and epoch_acc>best_acc:
                         best_acc=epoch_acc
                         best_model=copy.deepcopy(model)
@@ -445,8 +447,9 @@ class model_pip(object):
             del(inp)
             del(labels)
         t_acc = np.trace(c_mat)/np.sum(c_mat)
-        print('test accuracy= ',t_acc)
-        print(c_mat)
+        if(self.verbose):
+            print('test accuracy= ',t_acc)
+            print(c_mat)
        
             
         np.savetxt(model_dir+'/'+folder+'/'+model_name[:model_name.find('.pth.tar')]+'/'+model_name+'c_mat.txt',c_mat.astype(int))
