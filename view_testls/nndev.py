@@ -23,7 +23,7 @@ import scipy.misc as misc
 import torch
 import numpy as np
 from torch.autograd import Variable
-
+from torch.nn import DataParallel
 import sys
 import os
 import scipy
@@ -57,6 +57,11 @@ class model_pip(object):
         self.verbose = verbose
         self.resume = resume
         self.model_path_continue=model_path_continue
+        if(self.gpu in range(0,torch.cuda.device_count())):
+            torch.cuda.set_device(self.gpu)
+        else:
+            torch.cuda.set_device(self.gpu[0])
+
         ### TODO , correct below code, this is not optimal
         self.num_output = len(os.listdir(data_path+'test/'))
         #torch.manual_seed(1)
@@ -83,7 +88,7 @@ class model_pip(object):
                 }
             
             else:
-                print('here')
+                #print('here')
                 data_transforms = {
                 'test':transforms.Compose([transforms.Scale(300),
                 transforms.RandomCrop(300),
@@ -233,10 +238,17 @@ class model_pip(object):
         
         criterion = self.criterion
         
-        if(torch.cuda.is_available() and self.use_gpu):
-            torch.cuda.set_device(self.gpu)
+        
+        if(torch.cuda.is_available() and self.use_gpu and self.gpu in range(0,torch.cuda.device_count())):
+            #torch.cuda.set_device(self.gpu)
             model=model.cuda()
-            criterion=criterion.cuda()
+            #criterion=criterion.cuda()
+        
+        elif(torch.cuda.is_available() and self.use_gpu and  len(self.gpu)>1):
+            
+            model = DataParallel(model,device_ids = self.gpu).cuda()
+            #print('here')
+            #criterion = DataParallel(model,device_ids=self.gpu)
         
         best_acc = 0.0
         best_epoch = 0
@@ -245,7 +257,7 @@ class model_pip(object):
         if(~self.fe):
         
             for epoch in range(epoch_init,epochs):
-                print('Epoch = ',epoch)
+                #print('Epoch = ',epoch)
                 
                 for phase in ['train','val']:
                     if(phase == 'train'):
@@ -287,12 +299,13 @@ class model_pip(object):
                             temp2[labels.size(0):] = 0
                             labels = temp2
                             del(temp2)
+                        #print(epoch)
                         outputs = model(inputs)
                         #print(outputs.size())
                         #print(labels.size())
                         if(n=='Inception'):
                             if phase=='val':
-
+                                #print('val')
                                 _,preds = torch.max(outputs.data,1)
                                 loss = criterion(outputs,labels)
                             else:
@@ -349,7 +362,8 @@ class model_pip(object):
     
     def test(self,model_dir,model_name,random_crop,test_on,n='None',save_miscl = False,folder = 'misc'):
         #TODO modify class to add a test path
-        self.model.eval()
+        model = self.model
+        model.eval()
         epoch_acc = 0
         try:
             shutil.rmtree(model_dir+'/'+folder+'/'+model_name[:model_name.find('.pth.tar')])
@@ -360,20 +374,31 @@ class model_pip(object):
         dsets,dset_loaders,dset_sizes = self.transform(rand=random_crop,test_only=test_on)
         flag=False
         model_ind = model_name[:model_dir.find('.pth.tar')]
-        if(torch.cuda.is_available() and self.use_gpu):
-            flag=True
-        if(flag):
-            torch.cuda.set_device(self.gpu)
-            self.model.cuda()
+        multi_gpu = False
+        
+        if(torch.cuda.is_available() and self.use_gpu and (self.gpu in range(0,torch.cuda.device_count())) ):
+            #print('here')
+            #torch.cuda.set_device(self.gpu)
+            model=model.cuda()
+            
+            #print('there')
+            #criterion=criterion.cuda()
+        
+        elif(torch.cuda.is_available() and self.use_gpu and  len(self.gpu)>1):
+            multi_gpu = True
+            #model = model.cuda(self.gpu[0])
+            model = DataParallel(model,device_ids = self.gpu).cuda()
+            #criterion = DataParallel(model,device_ids=self.gpu)
+        
         running_corrects = 0  
         c_mat = np.zeros((self.num_output,self.num_output))
         #print(c_mat.shape)
         for data in dset_loaders['test']:
             inp_img,labels = data
              
-            if(flag):
+            if(torch.cuda.is_available()):
                 inp_img,labels=inp_img.cuda(),labels.cuda()
-        
+            
             inp,labels=Variable(inp_img),Variable(labels)
             
             if(inp.size(0)<self.b_size and  n == 'Inception'):
@@ -396,7 +421,7 @@ class model_pip(object):
                         
 
             
-            output = self.model(inp)
+            output = model(inp)
             if(n=='Inception'):
                 
 
@@ -409,7 +434,10 @@ class model_pip(object):
                 #print(labels.data.size())
                 #print(output.data.size())
                 #print(labels.data)
-            running_corrects += torch.sum(preds == labels.data)
+                #print(preds)
+                #print(labels)
+            #preds = preds.cpu()
+            running_corrects += torch.sum(preds.cpu() == labels.cpu().data)
             
             ### save misclassified ones
             #print(preds.cpu().numpy().shape)
