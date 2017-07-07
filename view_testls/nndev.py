@@ -7,6 +7,7 @@ import torch.nn as nn
 #from torchvision.models import Inception3
 import numpy as np
 from torch.autograd import Variable
+from collections import OrderedDict
 import torch.nn.functional as F
 from torchvision import datasets,models,transforms
 import torch.optim as optim
@@ -212,7 +213,21 @@ class model_pip(object):
     def load_model(self,filename):
         checkpoint = torch.load(filename)
         start_epoch = checkpoint['epochs']
-        self.model.load_state_dict(checkpoint['state_dict'])
+        
+        
+        # create new OrderedDict that does not contain `module.`
+        if(len(self.gpu)>1):
+            new_state_dict = OrderedDict()
+            for k, v in checkpoint['state_dict'].items():
+                name = k[7:] # remove `module.`
+                new_state_dict[name] = v
+            # load params
+            self.model.load_state_dict(new_state_dict)
+        
+        if(self.gpu in range(0,torch.cuda.device_count())):
+            
+            self.model.load_state_dict(checkpoint['state_dict'])
+            
         if(self.resume):
             self.model_optimizer.load_state_dict(checkpoint['optimizer'])
         #return model,optimz,start_epoch
