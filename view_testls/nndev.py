@@ -65,6 +65,8 @@ class model_pip(object):
 
         ### TODO , correct below code, this is not optimal
         self.num_output = len(os.listdir(data_path+'test/'))
+        torch.manual_seed(1)
+        torch.cuda.manual_seed(1)
         #torch.manual_seed(1)
         #torch.cuda.manual_seed(1)
     def transform(self,rand = False,test_only = False):
