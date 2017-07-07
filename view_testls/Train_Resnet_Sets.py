@@ -24,15 +24,17 @@ def Train_Resnet_Sets(gpunum,pretrain,mainfolder,number_of_sets,number_of_views,
     from torchvision import datasets,models,transforms
     import torch.nn as nn
     from nndev import model_pip
+    from nndev import model_pip
     from Conmat_TPR import calculate_APR as CAPR
     #from IPython.display import clear_output
     import numpy as np
+    
     #-------------------------------------------------------------------------------------------------------#
     #print pretrain
     temp_Pr=np.zeros((number_of_views,1))
     temp_Re=np.zeros((number_of_views,1))
     Total_Accuracy=np.zeros((number_of_sets,1))
-    for j in xrange(0,number_of_sets):
+    for j in range(0,number_of_sets):
         k=j+1
         setnumber="SET"+str(k)
         print "============================================================================================"
@@ -52,16 +54,19 @@ def Train_Resnet_Sets(gpunum,pretrain,mainfolder,number_of_sets,number_of_views,
         savepath=mainfolder+setnumber+"/"+Model_name
         
         res.fc = nn.Linear(res.fc.in_features,number_of_views)
-        obj = model_pip(model_in=res,scale=True,batch_size=batch_size,use_gpu=True,gpu=gpunum,data_path=datapath,lr=lr,lr_decay_epoch=lr_decay)
+        obj = model_pip(model_in=res,scale=True,batch_size=batch_size,use_gpu=True,gpu=gpunum,data_path=datapath,lr=lr,lr_decay_epoch=lr_decay,verbose=True)
         model = obj.train_model(epochs=epochs)
         obj.store_model(f_name=savepath)
-        del (obj)
-        print "==============================Testing Started==============================================="
+        print ("==============================Testing Started===============================================")
         mdir=mainfolder+str(setnumber)+"/"
+        del (obj)
         obj = model_pip(model_in=res,scale=True,batch_size=batch_size,use_gpu=True,gpu=gpunum,data_path=datapath,lr=lr,lr_decay_epoch=lr_decay)
+        #obj.test(self,model_dir,model_name,random_crop,test_on,n='None',save_miscl = False,folder = 'misc')
+                
         obj.load_model(savepath)
         obj.test(model_dir=mdir,model_name=Model_name,save_miscl = True,test_on=True,n='None',random_crop=False,folder='misc')
         del (obj)
+        
         
         folderpath=mainfolder+setnumber+"/misc/"+Model_name[:-8].strip().replace(" ","")+"/"+Model_name+"c_mat.txt"
         Confusion_mat=np.loadtxt(folderpath)
@@ -69,8 +74,8 @@ def Train_Resnet_Sets(gpunum,pretrain,mainfolder,number_of_sets,number_of_views,
         temp_Pr=np.concatenate((temp_Pr,Pr),axis=1)
         temp_Re=np.concatenate((temp_Re,Re),axis=1)
         Total_Accuracy[j,0]=TA
-        print temp_Pr.shape
-        print Pr.shape
+        print (temp_Pr.shape)
+        print (Pr.shape)
         save_file=mainfolder+setnumber+"/Confusion_matrix"+Identifier+".txt"
         np.savetxt(save_file,Confusion_mat)
 
@@ -87,7 +92,7 @@ def Train_Resnet_Sets(gpunum,pretrain,mainfolder,number_of_sets,number_of_views,
     Total_Accuracy=np.nan_to_num(Total_Accuracy)
     Precision=np.nan_to_num(Precision)
     Recall=np.nan_to_num(Recall)
-    print Total_Accuracy
+    print (Total_Accuracy)
     Total_Accuracy_mean=np.average(Total_Accuracy,axis=0)
     Precision_mean=np.average(Precision,axis=1)
     Recall_mean=np.average(Recall,axis=1)
