@@ -58,10 +58,10 @@ class model_pip(object):
         self.verbose = verbose
         self.resume = resume
         self.model_path_continue=model_path_continue
-        if(self.gpu in range(0,torch.cuda.device_count())):
-            torch.cuda.set_device(self.gpu)
-        else:
-            torch.cuda.set_device(self.gpu[0])
+        #if(self.gpu in range(0,torch.cuda.device_count())):
+        #    torch.cuda.set_device(self.gpu)
+        #else:
+        #    torch.cuda.set_device(self.gpu[0])
 
         ### TODO , correct below code, this is not optimal
         self.num_output = len(os.listdir(data_path+'test/'))
@@ -291,7 +291,7 @@ class model_pip(object):
                         inputs,labels = data
                         #print(inputs.size())
                         if(torch.cuda.is_available() and self.use_gpu):
-                            inputs,labels = Variable(inputs.cuda()),Variable(labels.cuda())
+                            inputs,labels = Variable(inputs.cuda(async=True)),Variable(labels.cuda(async=True))
                         else:
                             inputs,labels = Variable(inputs),Variable(labels)
                         
@@ -302,8 +302,8 @@ class model_pip(object):
                             flag=1
                             
                             if(torch.cuda.is_available() and self.use_gpu):   
-                                temp = Variable(torch.zeros((self.b_size,3,300,300)).cuda())
-                                temp2 = Variable(torch.LongTensor(self.b_size).cuda())
+                                temp = Variable(torch.zeros((self.b_size,3,300,300)).cuda(async=True))
+                                temp2 = Variable(torch.LongTensor(self.b_size).cuda(async=True))
                                              
                             else:
                                 temp=Variable(torch.zeros((self.b_size,3,300,300)))
@@ -414,7 +414,7 @@ class model_pip(object):
             inp_img,labels = data
              
             if(torch.cuda.is_available()):
-                inp_img,labels=inp_img.cuda(),labels.cuda()
+                inp_img,labels=inp_img.cuda(async=True),labels.cuda(async=True)
             
             inp,labels=Variable(inp_img),Variable(labels)
             
@@ -422,8 +422,8 @@ class model_pip(object):
                 #flag=1
                             
                 if(flag):   
-                    temp = Variable(torch.zeros((self.b_size,3,300,300)).cuda())
-                    temp2 = Variable(torch.LongTensor(self.b_size).cuda())
+                    temp = Variable(torch.zeros((self.b_size,3,300,300)).cuda(async=True))
+                    temp2 = Variable(torch.LongTensor(self.b_size).cuda(async=True))
                                              
                 else:
                     temp=Variable(torch.zeros((self.b_size,3,300,300)))
