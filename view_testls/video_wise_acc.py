@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import  torch.utils.data as data_utils
 import torch
 import torch.nn as nn
-from torchvision.models import inception
-from torchvision.models import Inception3
+#from torchvision.models import inception
+#from torchvision.models import Inception3
 import numpy as np
 from torch.autograd import Variable
 import torch.nn.functional as F
@@ -26,12 +26,12 @@ import os
 import scipy
 import cv2
 from PIL import Image
-vc_nums = ['VC_10','VC_11','VC_12']
+vc_nums = ['VC_15']
 
 set_nums = ['SET1','SET2','SET3','SET4','SET5','SET6','SET7','SET8','SET9','SET10']
 import os
 import shutil
-vc_num = 'VC_10'
+vc_num = 'VC_15'
 import gc
 from nndev import *
 main_path =  '/data/Gurpreet/RUNS/'
@@ -43,6 +43,8 @@ except:
 def find_sec(name):
     return [i for i,s in enumerate(name) if s=='_'][1]
 
+
+
 for vc_num in vc_nums:
     for set_num in set_nums:
         model_names = [i for i in os.listdir(main_path+'/'+vc_num+'/'+set_num+'/') if '.pth.tar' in i and len(i)>5]
@@ -52,6 +54,7 @@ for vc_num in vc_nums:
         for model_name in model_names:    
             correct = 0
             wrong = 0
+            
             #model_path = '/data/Gurpreet/RUNS/VC_10/SET1/'
             #model_name='ResNetModel_Pretrained_7_views_bs_100_e_10_28062017_0640.pth.tar'
             #test_path = '/data/Gurpreet/RUNS/VC_10/SET1/dataset/test'
@@ -80,8 +83,9 @@ for vc_num in vc_nums:
             p2 = '/data/gabriel/pat_acc'
             res = models.resnet18(pretrained=True)
             res.fc = nn.Linear(res.fc.in_features,len(os.listdir(model_path+'/dataset/test'))) 
-
-
+            
+            conf_mat = np.zeros((len(os.listdir(model_path+'/dataset/test')),len(os.listdir(model_path+'/dataset/test'))))
+            
             for i in range(0,len(ord_label)):
                 #print('i= ',i)
                 #os.makedirs('/data/gabriel/temp/'+'/test/'+ord_label[i])
@@ -92,8 +96,9 @@ for vc_num in vc_nums:
                     except:
                         shutil.rmtree('/data/gabriel/pat_acc/temp/test/')
                         os.makedirs('/data/gabriel/pat_acc/temp/test/')
-
-
+                    #print(i)
+                    #print(j)
+                    #print(ord_label[i])
                     for z in range(0,len(ord_label)):
                         try:
 
@@ -127,14 +132,31 @@ for vc_num in vc_nums:
                     arr = np.loadtxt(p2+'/'+vc_num+'_'+set_num+'/'+m_name
                                      [:m_name.find('.pth.tar')]+'/'+m_name+'accuracy.txt')
                     #print(arr)
+                    arr2 = np.loadtxt(p2+'/'+vc_num+'_'+set_num+'/'+m_name
+                                     [:m_name.find('.pth.tar')]+'/'+m_name+'c_mat.txt')
+                    
+                    for row in range(0,arr2.shape[0]):
+                        if(arr2[row,:].sum()>0):
+                            conf_mat[row,arr2[row,:].argmax()]+=1.0
+                            break
+                    
                     del(obj1)
+                    
                     if(arr>0.5):
-                        correct+=1
+                        correct+=1.0
                     else:
-                        wrong+=1
+                        wrong+=1.0
                     #print(correct,wrong)
+                #print(correct,wrong)
+            #print(correct,wrong) 
+            #print(correct/(correct+wrong))
+            
             acc_arr = np.array([correct/(correct+wrong),correct,wrong,correct+wrong])
             np.savetxt('/data/gabriel/pat_accuracy/'+vc_num+'_'+set_num+'_'+model_name[:model_name.find('.pth.tar')]+
                        'pat_accuracy.txt',np.array(correct/(correct+wrong)).reshape(1,))    
+            np.savetxt('/data/gabriel/pat_accuracy/'+vc_num+'_'+set_num+'_'+model_name[:model_name.find('.pth.tar')]+
+                       'c_mat.txt',conf_mat)    
+            
             print(vc_num,set_num,model_name)
             print(correct/(correct+wrong))
+            print(conf_mat)
