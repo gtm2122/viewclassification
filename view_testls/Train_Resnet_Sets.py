@@ -20,7 +20,8 @@
 
 #--------------------------------------------------------------------------------------------------------
 
-def Train_Resnet_Sets(gpunum,pretrain,mainfolder,number_of_sets,number_of_views,lr,lr_decay,batch_size,epochs,Identifier):
+def Train_Resnet_Sets(gpunum,pretrain,mainfolder,number_of_sets,number_of_views,lr,
+                      lr_decay,batch_size,epochs,Identifier,the_model='resnet18'):
     from torchvision import datasets,models,transforms
     import torch.nn as nn
     from nndev import model_pip
@@ -43,17 +44,37 @@ def Train_Resnet_Sets(gpunum,pretrain,mainfolder,number_of_sets,number_of_views,
         if (pretrain.lower()=="true"):
             #print "inside true"
             pretrained_text="pretrained"
-            res = models.resnet18(pretrained=True)
+    
+            if(the_model == 'resnet18'):
+                res = models.resnet18(pretrained=True)
+                res.fc = nn.Linear(res.fc.in_features,number_of_views)
+            elif(the_model == 'vgg'):
+                res = models.vgg19(pretrained=True)
+                res.classifier._modules['6'] = nn.Linear(4096,number_of_views)
+            elif(the_model == 'densenet'):
+                res = models.densenet161(pretrained=True,growth_rate = 48)
+                res.fc = nn.Linear(res.fc.in_features,number_of_views)
+
         else :
             pretrained_text="scratch"
             #print "inside false"
-            res = models.resnet18(pretrained=False)
+            if(the_model == 'resnet18'):
+                res = models.resnet18(pretrained=False)
+                res.fc = nn.Linear(res.fc.in_features,number_of_views)
+            elif(the_model == 'vgg'):
+                res = models.vgg19(pretrained=False)
+                res.classifier._modules['6'] = nn.Linear(4096,number_of_views)
+            elif(the_model == 'densenet'):
+                res = models.densenet161(pretrained=False,growth_rate = 48)
+                res.fc = nn.Linear(res.fc.in_features,number_of_views)
+
+            #res = models.resnet18(pretrained=False)
+            #res.fc = nn.Linear(res.fc.in_features,number_of_views)
         
         Model_name="ResNetModel_"+str(pretrained_text)+"_"+str(number_of_views)+"_views_bs_"+str(batch_size)+"_e_"+str(epochs)+"_"+str(Identifier)+".pth.tar"
         datapath=mainfolder+setnumber+"/dataset/"
         savepath=mainfolder+setnumber+"/"+Model_name
         
-        res.fc = nn.Linear(res.fc.in_features,number_of_views)
         obj = model_pip(model_in=res,scale=True,batch_size=batch_size,use_gpu=True,gpu=gpunum,data_path=datapath,lr=lr,lr_decay_epoch=lr_decay,verbose=True)
         model = obj.train_model(epochs=epochs)
         obj.store_model(f_name=savepath)

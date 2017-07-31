@@ -94,6 +94,7 @@ class model_pip(object):
         self.num_output = len(os.listdir(data_path+'test/'))
         torch.manual_seed(1)
         torch.cuda.manual_seed(1)
+	torch.cudnn.benchmark(True)
         #torch.manual_seed(1)
         #torch.cuda.manual_seed(1)
     
