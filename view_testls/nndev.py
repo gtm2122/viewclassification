@@ -58,17 +58,148 @@ class model_pip(object):
         self.verbose = verbose
         self.resume = resume
         self.model_path_continue=model_path_continue
-        #if(self.gpu in range(0,torch.cuda.device_count())):
-        #    torch.cuda.set_device(self.gpu)
+        
+        try:
+            if(self.gpu in range(0,torch.cuda.device_count())):
+                torch.cuda.set_device(self.gpu)
+        except:
+            pass
         #else:
         #    torch.cuda.set_device(self.gpu[0])
-
+        self.train_loss = []
+        self.val_loss = []
+        self.test_loss = []
+        
+        self.train_acc = []
+        self.val_acc = []
+        self.test_acc = []
+        
+        self.plot_epoch_loss_train = []
+        self.plot_epoch_loss_val = []
+        self.plot_epoch_loss_test = []
+        
+        self.plot_epoch_acc_train = []
+        self.plot_epoch_acc_val = []
+        self.plot_epoch_acc_test = []
+        
+        self.test_loss_figure = plt.figure()
+        self.train_loss_figure = plt.figure()
+        self.val_loss_figure = plt.figure()
+        
+        self.test_acc_figure = plt.figure()
+        self.train_acc_figure = plt.figure()
+        self.val_acc_figure = plt.figure()
+        
         ### TODO , correct below code, this is not optimal
         self.num_output = len(os.listdir(data_path+'test/'))
         torch.manual_seed(1)
         torch.cuda.manual_seed(1)
         #torch.manual_seed(1)
         #torch.cuda.manual_seed(1)
+    
+    
+    def plot(self,value,name,epoch_in):
+        #self.plot_epoch.append(epoch_in)
+        
+        if('loss' in name):
+            if('train' in name):
+                self.plot_epoch_loss_train.append(epoch_in)
+                self.train_loss.append(value)
+                
+                ax1 = self.train_loss_figure.add_subplot(111)
+                
+                ax1.scatter(np.array(self.plot_epoch_loss_train),np.array(self.train_loss))
+                #print(np.array(self.train_loss))
+                #print(np.array(self.plot_epoch_train))
+                
+                try:
+                    shutil.remove(self.data_path+'/'+'train/'+name)
+                    self.train_loss_figure.savefig(self.data_path+'/'+'train/'+name)
+                except:
+                    self.train_loss_figure.savefig(self.data_path+'/'+'train/'+name)
+            
+            elif('test' in name):
+                self.plot_epoch_loss_test.append(epoch_in)
+                self.test_loss.append(value)
+                
+                ax2 = self.test_loss_figure.add_subplot(111)
+                
+                ax2.scatter(np.array(self.plot_epoch_loss_test),np.array(self.test_loss))
+
+                try:
+                    shutil.remove(self.data_path+'/'+'test/'+name)
+                    self.test_loss_figure.savefig(self.data_path+'/'+'test/'+name)
+                except:
+                    self.test_loss_figure.savefig(self.data_path+'/'+'test/'+name)
+
+
+
+            elif('val' in name):
+                self.plot_epoch_loss_val.append(epoch_in)
+                self.val_loss.append(value)
+                
+                ax3 = self.val_loss_figure.add_subplot(111)
+                
+                ax3.scatter(np.array(self.plot_epoch_loss_val),np.array(self.val_loss))
+                
+                try:
+                    shutil.remove(self.data_path+'/'+'val/'+name)
+                    self.val_loss_figure.savefig(self.data_path+'/'+'val/'+name)
+                except:
+                    self.val_loss_figure.savefig(self.data_path+'/'+'val/'+name)
+        
+        elif('acc' in name):
+            if('train' in name):
+                self.plot_epoch_acc_train.append(epoch_in)
+                self.train_acc.append(value)
+                
+                ax4 = self.train_acc_figure.add_subplot(111)
+                
+                ax4.scatter(np.array(self.plot_epoch_acc_train),np.array(self.train_acc))
+                #print(np.array(self.train_loss))
+                #print(np.array(self.plot_epoch_train))
+
+                try:
+                    shutil.remove(self.data_path+'/'+'train/'+name)
+                    self.train_acc_figure.savefig(self.data_path+'/'+'train/'+name)
+                except:
+                    self.train_acc_figure.savefig(self.data_path+'/'+'train/'+name)
+                    
+            elif('test' in name):
+                self.plot_epoch_acc_test.append(epoch_in)
+                self.test_acc.append(value)
+                
+                ax5 = self.test_acc_figure.add_subplot(111)
+                
+                ax5.scatter(np.array(self.plot_epoch_acc_test),np.array(self.test_acc))
+                
+                
+                try:
+                    shutil.remove(self.data_path+'/'+'test/'+name)
+                    self.test_acc_figure.savefig(self.data_path+'/'+'test/'+name)
+                except:
+                    self.test_acc_figure.savefig(self.data_path+'/'+'test/'+name)
+            
+            
+            
+            elif('val' in name):
+                self.plot_epoch_acc_val.append(epoch_in)
+                self.val_acc.append(value)
+                
+                ax6 = self.val_acc_figure.add_subplot(111)
+                
+                ax6.scatter(np.array(self.plot_epoch_acc_val),np.array(self.val_acc))
+                try:
+                    shutil.remove(self.data_path+'/'+'val/'+name)
+                    self.val_acc_figure.savefig(self.data_path+'/'+'val/'+name)
+                except:
+                    self.val_acc_figure.savefig(self.data_path+'/'+'val/'+name)
+
+            
+        
+           
+        
+    
     def transform(self,rand = False,test_only = False):
         
         if(test_only):
@@ -172,7 +303,7 @@ class model_pip(object):
             transforms.CenterCrop(300),
             transforms.ToTensor(),
             transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
-            ]),                       'test':transforms.Compose([transforms.Scale(300),
+            ]),                       'test':transforms.Compose([#print(loss)transforms.Scale(300),
                 transforms.RandomCrop(300),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
@@ -218,7 +349,7 @@ class model_pip(object):
         
         
         # create new OrderedDict that does not contain `module.`
-        if(len(self.gpu)>1):
+        if(not(isinstance(self.gpu,int))):
             new_state_dict = OrderedDict()
             for k, v in checkpoint['state_dict'].items():
                 name = k[7:] # remove `module.`
@@ -291,7 +422,7 @@ class model_pip(object):
                         inputs,labels = data
                         #print(inputs.size())
                         if(torch.cuda.is_available() and self.use_gpu):
-                            inputs,labels = Variable(inputs.cuda(async=True)),Variable(labels.cuda(async=True))
+                            inputs,labels = Variable(inputs.cuda(async=False)),Variable(labels.cuda(async=False))
                         else:
                             inputs,labels = Variable(inputs),Variable(labels)
                         
@@ -302,8 +433,8 @@ class model_pip(object):
                             flag=1
                             
                             if(torch.cuda.is_available() and self.use_gpu):   
-                                temp = Variable(torch.zeros((self.b_size,3,300,300)).cuda(async=True))
-                                temp2 = Variable(torch.LongTensor(self.b_size).cuda(async=True))
+                                temp = Variable(torch.zeros((self.b_size,3,300,300)).cuda(async=False))
+                                temp2 = Variable(torch.LongTensor(self.b_size).cuda(async=False))
                                              
                             else:
                                 temp=Variable(torch.zeros((self.b_size,3,300,300)))
@@ -332,7 +463,7 @@ class model_pip(object):
                         else:
                             _,preds = torch.max(outputs.data,1)
                             loss = criterion(outputs,labels)
-
+                            
 
 
                         if phase=='train':
@@ -349,8 +480,11 @@ class model_pip(object):
                         del(inputs)
                         del(labels)
                         del(outputs)
+                   
                     epoch_loss = running_loss/dset_sizes[phase]
+                    self.plot(epoch_loss,'epoch_loss_'+phase,epoch)
                     epoch_acc = running_corrects/dset_sizes[phase]
+                    self.plot(epoch_acc,'epoch_acc_'+phase,epoch)
                     #epoch_tpr = running_tp/dset_sizes[phase]
                     print(phase + '{} Loss: {:.10f} \nAcc: {:.4f}'.format(phase,epoch_loss,epoch_acc))
                     #print(c_mat)
@@ -414,7 +548,7 @@ class model_pip(object):
             inp_img,labels = data
              
             if(torch.cuda.is_available()):
-                inp_img,labels=inp_img.cuda(async=True),labels.cuda(async=True)
+                inp_img,labels=inp_img.cuda(async=False),labels.cuda(async=False)
             
             inp,labels=Variable(inp_img),Variable(labels)
             
@@ -422,8 +556,8 @@ class model_pip(object):
                 #flag=1
                             
                 if(flag):   
-                    temp = Variable(torch.zeros((self.b_size,3,300,300)).cuda(async=True))
-                    temp2 = Variable(torch.LongTensor(self.b_size).cuda(async=True))
+                    temp = Variable(torch.zeros((self.b_size,3,300,300)).cuda(async=False))
+                    temp2 = Variable(torch.LongTensor(self.b_size).cuda(async=False))
                                              
                 else:
                     temp=Variable(torch.zeros((self.b_size,3,300,300)))
