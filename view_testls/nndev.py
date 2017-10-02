@@ -63,9 +63,9 @@ class model_pip(object):
             if(self.gpu in range(0,torch.cuda.device_count())):
                 torch.cuda.set_device(self.gpu)
         except:
-            pass
-        #else:
-        #    torch.cuda.set_device(self.gpu[0])
+        
+        
+            torch.cuda.set_device(self.gpu[0])
         self.train_loss = []
         self.val_loss = []
         self.test_loss = []
@@ -94,7 +94,7 @@ class model_pip(object):
         self.num_output = len(os.listdir(data_path+'test/'))
         torch.manual_seed(1)
         torch.cuda.manual_seed(1)
-	torch.cudnn.benchmark(True)
+        #torch.cudnn.benchmark(True)
         #torch.manual_seed(1)
         #torch.cuda.manual_seed(1)
     
@@ -118,7 +118,7 @@ class model_pip(object):
                     self.train_loss_figure.savefig(self.data_path+'/'+'train/'+name)
                 except:
                     self.train_loss_figure.savefig(self.data_path+'/'+'train/'+name)
-            
+                plt.close()
             elif('test' in name):
                 self.plot_epoch_loss_test.append(epoch_in)
                 self.test_loss.append(value)
@@ -126,14 +126,14 @@ class model_pip(object):
                 ax2 = self.test_loss_figure.add_subplot(111)
                 
                 ax2.scatter(np.array(self.plot_epoch_loss_test),np.array(self.test_loss))
-
+                
                 try:
                     shutil.remove(self.data_path+'/'+'test/'+name)
                     self.test_loss_figure.savefig(self.data_path+'/'+'test/'+name)
                 except:
                     self.test_loss_figure.savefig(self.data_path+'/'+'test/'+name)
 
-
+                plt.close()
 
             elif('val' in name):
                 self.plot_epoch_loss_val.append(epoch_in)
@@ -148,7 +148,7 @@ class model_pip(object):
                     self.val_loss_figure.savefig(self.data_path+'/'+'val/'+name)
                 except:
                     self.val_loss_figure.savefig(self.data_path+'/'+'val/'+name)
-        
+                plt.close()
         elif('acc' in name):
             if('train' in name):
                 self.plot_epoch_acc_train.append(epoch_in)
@@ -165,7 +165,7 @@ class model_pip(object):
                     self.train_acc_figure.savefig(self.data_path+'/'+'train/'+name)
                 except:
                     self.train_acc_figure.savefig(self.data_path+'/'+'train/'+name)
-                    
+                plt.close()
             elif('test' in name):
                 self.plot_epoch_acc_test.append(epoch_in)
                 self.test_acc.append(value)
@@ -182,7 +182,7 @@ class model_pip(object):
                     self.test_acc_figure.savefig(self.data_path+'/'+'test/'+name)
             
             
-            
+                plt.close()
             elif('val' in name):
                 self.plot_epoch_acc_val.append(epoch_in)
                 self.val_acc.append(value)
@@ -197,7 +197,7 @@ class model_pip(object):
                     self.val_acc_figure.savefig(self.data_path+'/'+'val/'+name)
 
             
-        
+                plt.close()
            
         
     
@@ -350,22 +350,36 @@ class model_pip(object):
         
         
         # create new OrderedDict that does not contain `module.`
-        if(not(isinstance(self.gpu,int))):
-            new_state_dict = OrderedDict()
-            for k, v in checkpoint['state_dict'].items():
+        #if(not(isinstance(self.gpu,int))):
+        new_state_dict = OrderedDict()
+        #try:
+        #    self.model.load_state_dict(new_state_dict)
+
+        #try:
+
+        for k, v in checkpoint['state_dict'].items():
+            #print(k)
+            if('module' in k):
                 name = k[7:] # remove `module.`
-                new_state_dict[name] = v
+            #name = k
+            else:
+                name = k
+
+            new_state_dict[name] = v
             # load params
-            self.model.load_state_dict(new_state_dict)
-        
-        if(self.gpu in range(0,torch.cuda.device_count())):
+            #except:
+            #self.model.load_state_dict(new_state_dict)
+        self.model.load_state_dict(new_state_dict)
+            
+        '''
+        #elif(self.gpu in range(0,torch.cuda.device_count())):
             
             self.model.load_state_dict(checkpoint['state_dict'])
             
         if(self.resume):
             self.model_optimizer.load_state_dict(checkpoint['optimizer'])
         #return model,optimz,start_epoch
-    
+        '''
     def train_model(self, epochs=30,n=None):
         dsets,dset_loaders,dset_sizes = self.transform() 
         print(dset_sizes)
@@ -415,7 +429,8 @@ class model_pip(object):
                         self.lr_scheduler(epoch)
                     else:
                         model.train(False)
-                    c_mat = np.zeros((self.num_output,self.num_output)) 
+                    c_mat = np.zeros((self.num_output,self.num_output))
+                    #print(self.num_output)
                     running_loss = 0.0
                     running_corrects = 0.0
                     running_tp = 0.0
@@ -426,7 +441,7 @@ class model_pip(object):
                             inputs,labels = Variable(inputs.cuda(async=False)),Variable(labels.cuda(async=False))
                         else:
                             inputs,labels = Variable(inputs),Variable(labels)
-                        
+                        #print(inputs.size())
                         self.model_optimizer.zero_grad()
                         flag=0
                         
@@ -474,7 +489,6 @@ class model_pip(object):
                         running_loss+=loss.data[0]
                         running_corrects += torch.sum(preds == labels.data)
                         for i in range(0,labels.data.cpu().numpy().shape[0]):
-
                             c_mat[labels.data.cpu().numpy()[i],preds.cpu().numpy()[i]]+=1
 
                         self.epochs = epoch
@@ -483,13 +497,13 @@ class model_pip(object):
                         del(outputs)
                    
                     epoch_loss = running_loss/dset_sizes[phase]
-                    self.plot(epoch_loss,'epoch_loss_'+phase,epoch)
                     epoch_acc = running_corrects/dset_sizes[phase]
-                    self.plot(epoch_acc,'epoch_acc_'+phase,epoch)
+                    #self.plot(epoch_acc,'epoch_acc_'+phase,epoch)
                     #epoch_tpr = running_tp/dset_sizes[phase]
                     print(phase + '{} Loss: {:.10f} \nAcc: {:.4f}'.format(phase,epoch_loss,epoch_acc))
                     #print(c_mat)
                     if(self.verbose):
+                        self.plot(epoch_loss,'epoch_loss_'+phase,epoch)
                     
                         print(c_mat)
                     if phase=='val' and epoch_acc>best_acc:
@@ -512,7 +526,8 @@ class model_pip(object):
                           'optimizer':self.model_optimizer.state_dict()}
         torch.save(state,f_name)
     
-    def test(self,model_dir,model_name,random_crop,test_on,n='None',save_miscl = False,folder = 'misc'):
+    def test(self,model_dir,model_name,random_crop,test_on,n='None',save_miscl = False,folder = 'misc',
+            save_codes=False):
         #TODO modify class to add a test path
         model = self.model
         model.eval()
@@ -532,12 +547,13 @@ class model_pip(object):
             #print('here')
             #torch.cuda.set_device(self.gpu)
             model=model.cuda()
-            
+            flag=True
             #print('there')
             #criterion=criterion.cuda()
         
         elif(torch.cuda.is_available() and self.use_gpu and  len(self.gpu)>1):
             multi_gpu = True
+            flag=True
             #model = model.cuda(self.gpu[0])
             model = DataParallel(model,device_ids = self.gpu).cuda()
             #criterion = DataParallel(model,device_ids=self.gpu)
@@ -545,12 +561,16 @@ class model_pip(object):
         running_corrects = 0  
         c_mat = np.zeros((self.num_output,self.num_output))
         #print(c_mat.shape)
+
+        #code_dic = {}
+
         for data in dset_loaders['test']:
             inp_img,labels = data
              
-            if(torch.cuda.is_available()):
+            if(torch.cuda.is_available() and self.use_gpu):
                 inp_img,labels=inp_img.cuda(async=False),labels.cuda(async=False)
             
+                
             inp,labels=Variable(inp_img),Variable(labels)
             
             if(inp.size(0)<self.b_size and  n == 'Inception'):
@@ -574,6 +594,9 @@ class model_pip(object):
 
             
             output = model(inp)
+
+            print(output)
+
             if(n=='Inception'):
                 
 
@@ -601,24 +624,42 @@ class model_pip(object):
             
             label_np = labels.cpu().data.numpy().reshape(pred_np.shape[0],1)
             #print(pred_np.shape)
+            misc_arr = pred_np.squeeze()==label_np.squeeze()
+            #print(misc_arr)
+            
+            #print(pred_np)
+            #print(pred_np.shape)
             #print(label_np.shape)
-            misc_arr = pred_np==label_np
             #print(misc)
-            #print(misc.shape)
-            misc_ind = [i for i in range(0,pred_np.shape[0]) if misc_arr[i] == False]
+            #print(misc_arr.shape)
+            #print(misc_arr[0])
+            #print(misc_arr)
+            #try:
+            #print(misc_arr)
+            if(isinstance(misc_arr,np.ndarray)):
+                misc_ind = [i for i in range(0,pred_np.shape[0]) if misc_arr[i] == False]
+            elif(misc_ind==False):
+                misc_ind = [0]
+            if(not(isinstance(misc_ind,np.ndarray)) and misc_ind==False and save_miscl):
+                for i in misc_ind:
+                    #print(preds[i])
+                    #print(labels.data[i])
+                    misc_img = inp_img.cpu()[i].numpy().transpose(1,2,0)*np.array([0.229,0.224,0.225]) +np.array([0.485,0.456,0.406])
+                    count_file = len(os.listdir(model_dir+'/'+folder+'/'+model_name[:model_name.find('.pth.tar')]))
+                    #plt.imshow(misc_img),plt.show()
+                    misc.imsave(model_dir+'/'+folder+'/'+model_name[:model_name.find('.pth.tar')]+'/'+str(count_file+1)+'_'+str(label_np[i])+'_as_'+str(pred_np[i])+'.jpg',misc_img)
+                
+            #except:
+            
+            #    print(misc_arr.shape)
+            #    return
             #print(misc_ind)
             #print(misc_ind[0])
             #misc_ind = np.where(np.array((preds.cpu().numpy().reshape(self.b_size,)==labels.data.cpu().numpy().reshape(self.b_size,)))==False)[0]
             #print(misc_ind)
             #print(preds.cpu().numpy()==labels.data.cpu().numpy())
             #return
-            for i in misc_ind:
-                #print(preds[i])
-                #print(labels.data[i])
-                misc_img = inp_img.cpu()[i].numpy().transpose(1,2,0)*np.array([0.229,0.224,0.225]) +np.array([0.485,0.456,0.406])
-                count_file = len(os.listdir(model_dir+'/'+folder+'/'+model_name[:model_name.find('.pth.tar')]))
-                #plt.imshow(misc_img),plt.show()
-                misc.imsave(model_dir+'/'+folder+'/'+model_name[:model_name.find('.pth.tar')]+'/'+str(count_file+1)+'_'+str(label_np[i])+'_as_'+str(pred_np[i])+'.jpg',misc_img)
+            
             for i in range(0,labels.data.cpu().numpy().shape[0]):
 
                 c_mat[labels.data.cpu().numpy()[i],preds.cpu().numpy()[i]]+=1
@@ -626,6 +667,7 @@ class model_pip(object):
             del(inp_img)
             del(inp)
             del(labels)
+            del(misc_arr)
         t_acc = np.trace(c_mat)/np.sum(c_mat)
         if(self.verbose):
             print('test accuracy= ',t_acc)
