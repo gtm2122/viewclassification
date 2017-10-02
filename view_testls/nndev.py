@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
-
+#import matplotlib
+#matplotlib.use('Agg')
 import  torch.utils.data as data_utils
 import torch
 import torch.nn as nn
@@ -58,13 +59,14 @@ class model_pip(object):
         self.verbose = verbose
         self.resume = resume
         self.model_path_continue=model_path_continue
-        
+	print('here')        
         try:
             if(self.gpu in range(0,torch.cuda.device_count())):
                 torch.cuda.set_device(self.gpu)
         except:
             pass
-        #else:
+        print('here2')
+	#else:
         #    torch.cuda.set_device(self.gpu[0])
         self.train_loss = []
         self.val_loss = []
@@ -81,20 +83,20 @@ class model_pip(object):
         self.plot_epoch_acc_train = []
         self.plot_epoch_acc_val = []
         self.plot_epoch_acc_test = []
+        #print('here3')
+        #self.test_loss_figure = plt.figure()
+        #self.train_loss_figure = plt.figure()
+        #self.val_loss_figure = plt.figure()
         
-        self.test_loss_figure = plt.figure()
-        self.train_loss_figure = plt.figure()
-        self.val_loss_figure = plt.figure()
-        
-        self.test_acc_figure = plt.figure()
-        self.train_acc_figure = plt.figure()
-        self.val_acc_figure = plt.figure()
-        
+        #self.test_acc_figure = plt.figure()
+        #self.train_acc_figure = plt.figure()
+        #self.val_acc_figure = plt.figure()
+        #print('here4')
         ### TODO , correct below code, this is not optimal
         self.num_output = len(os.listdir(data_path+'test/'))
         torch.manual_seed(1)
         torch.cuda.manual_seed(1)
-	torch.cudnn.benchmark(True)
+	torch.backends.cudnn.benchmark=True
         #torch.manual_seed(1)
         #torch.cuda.manual_seed(1)
     
@@ -107,96 +109,96 @@ class model_pip(object):
                 self.plot_epoch_loss_train.append(epoch_in)
                 self.train_loss.append(value)
                 
-                ax1 = self.train_loss_figure.add_subplot(111)
+                #ax1 = self.train_loss_figure.add_subplot(111)
                 
-                ax1.scatter(np.array(self.plot_epoch_loss_train),np.array(self.train_loss))
+                plt.scatter(np.array(self.plot_epoch_loss_train),np.array(self.train_loss))
                 #print(np.array(self.train_loss))
                 #print(np.array(self.plot_epoch_train))
                 
                 try:
                     shutil.remove(self.data_path+'/'+'train/'+name)
-                    self.train_loss_figure.savefig(self.data_path+'/'+'train/'+name)
+                    plt.savefig(self.data_path+'/'+'train/'+name)
                 except:
-                    self.train_loss_figure.savefig(self.data_path+'/'+'train/'+name)
-            
+                    plt.savefig(self.data_path+'/'+'train/'+name)
+            	plt.close()
             elif('test' in name):
                 self.plot_epoch_loss_test.append(epoch_in)
                 self.test_loss.append(value)
                 
-                ax2 = self.test_loss_figure.add_subplot(111)
+                #ax2 = self.test_loss_figure.add_subplot(111)
                 
-                ax2.scatter(np.array(self.plot_epoch_loss_test),np.array(self.test_loss))
+                plt.scatter(np.array(self.plot_epoch_loss_test),np.array(self.test_loss))
 
                 try:
                     shutil.remove(self.data_path+'/'+'test/'+name)
-                    self.test_loss_figure.savefig(self.data_path+'/'+'test/'+name)
+                    plt.savefig(self.data_path+'/'+'test/'+name)
                 except:
-                    self.test_loss_figure.savefig(self.data_path+'/'+'test/'+name)
-
+                    plt.savefig(self.data_path+'/'+'test/'+name)
+		plt.close()
 
 
             elif('val' in name):
                 self.plot_epoch_loss_val.append(epoch_in)
                 self.val_loss.append(value)
                 
-                ax3 = self.val_loss_figure.add_subplot(111)
+                #ax3 = self.val_loss_figure.add_subplot(111)
                 
-                ax3.scatter(np.array(self.plot_epoch_loss_val),np.array(self.val_loss))
+                plt.scatter(np.array(self.plot_epoch_loss_val),np.array(self.val_loss))
                 
                 try:
                     shutil.remove(self.data_path+'/'+'val/'+name)
-                    self.val_loss_figure.savefig(self.data_path+'/'+'val/'+name)
+                    plt.savefig(self.data_path+'/'+'val/'+name)
                 except:
-                    self.val_loss_figure.savefig(self.data_path+'/'+'val/'+name)
-        
+                    plt.savefig(self.data_path+'/'+'val/'+name)
+        	plt.close()
         elif('acc' in name):
             if('train' in name):
                 self.plot_epoch_acc_train.append(epoch_in)
                 self.train_acc.append(value)
                 
-                ax4 = self.train_acc_figure.add_subplot(111)
+                #ax4 = self.train_acc_figure.add_subplot(111)
                 
-                ax4.scatter(np.array(self.plot_epoch_acc_train),np.array(self.train_acc))
+                plt.scatter(np.array(self.plot_epoch_acc_train),np.array(self.train_acc))
                 #print(np.array(self.train_loss))
                 #print(np.array(self.plot_epoch_train))
 
                 try:
                     shutil.remove(self.data_path+'/'+'train/'+name)
-                    self.train_acc_figure.savefig(self.data_path+'/'+'train/'+name)
+                    plt.savefig(self.data_path+'/'+'train/'+name)
                 except:
-                    self.train_acc_figure.savefig(self.data_path+'/'+'train/'+name)
-                    
+                    plt.savefig(self.data_path+'/'+'train/'+name)
+		plt.close()
             elif('test' in name):
                 self.plot_epoch_acc_test.append(epoch_in)
                 self.test_acc.append(value)
                 
-                ax5 = self.test_acc_figure.add_subplot(111)
+                #ax5 = self.test_acc_figure.add_subplot(111)
                 
-                ax5.scatter(np.array(self.plot_epoch_acc_test),np.array(self.test_acc))
+                plt.scatter(np.array(self.plot_epoch_acc_test),np.array(self.test_acc))
                 
                 
                 try:
                     shutil.remove(self.data_path+'/'+'test/'+name)
-                    self.test_acc_figure.savefig(self.data_path+'/'+'test/'+name)
+                    plt.savefig(self.data_path+'/'+'test/'+name)
                 except:
-                    self.test_acc_figure.savefig(self.data_path+'/'+'test/'+name)
+                    plt.savefig(self.data_path+'/'+'test/'+name)
             
             
-            
+            	plt.close()
             elif('val' in name):
                 self.plot_epoch_acc_val.append(epoch_in)
                 self.val_acc.append(value)
                 
-                ax6 = self.val_acc_figure.add_subplot(111)
+                #ax6 = self.val_acc_figure.add_subplot(111)
                 
-                ax6.scatter(np.array(self.plot_epoch_acc_val),np.array(self.val_acc))
+                plt.scatter(np.array(self.plot_epoch_acc_val),np.array(self.val_acc))
                 try:
                     shutil.remove(self.data_path+'/'+'val/'+name)
-                    self.val_acc_figure.savefig(self.data_path+'/'+'val/'+name)
+                    plt.savefig(self.data_path+'/'+'val/'+name)
                 except:
-                    self.val_acc_figure.savefig(self.data_path+'/'+'val/'+name)
+                    plt.savefig(self.data_path+'/'+'val/'+name)
 
-            
+            	plt.close()
         
            
         
@@ -386,7 +388,7 @@ class model_pip(object):
         best_model=model
         
         criterion = self.criterion
-        
+        #print('here3')
         
         if(torch.cuda.is_available() and self.use_gpu and self.gpu in range(0,torch.cuda.device_count())):
             #torch.cuda.set_device(self.gpu)
@@ -398,7 +400,7 @@ class model_pip(object):
             model = DataParallel(model,device_ids = self.gpu).cuda()
             #print('here')
             #criterion = DataParallel(model,device_ids=self.gpu)
-        
+        #print('here4')
         best_acc = 0.0
         best_epoch = 0
         
@@ -483,9 +485,9 @@ class model_pip(object):
                         del(outputs)
                    
                     epoch_loss = running_loss/dset_sizes[phase]
-                    self.plot(epoch_loss,'epoch_loss_'+phase,epoch)
+                    #self.plot(epoch_loss,'epoch_loss_'+phase,epoch)
                     epoch_acc = running_corrects/dset_sizes[phase]
-                    self.plot(epoch_acc,'epoch_acc_'+phase,epoch)
+                    #self.plot(epoch_acc,'epoch_acc_'+phase,epoch)
                     #epoch_tpr = running_tp/dset_sizes[phase]
                     print(phase + '{} Loss: {:.10f} \nAcc: {:.4f}'.format(phase,epoch_loss,epoch_acc))
                     #print(c_mat)
@@ -598,16 +600,21 @@ class model_pip(object):
             #print(preds.cpu().numpy().reshape(self.b_size,) == labels.data.cpu().numpy().reshape(self.b_size,))
             
             pred_np = preds.cpu().numpy()
+            pred_np = pred_np.reshape(pred_np.shape[0],1)
+	    
             
             label_np = labels.cpu().data.numpy().reshape(pred_np.shape[0],1)
             #print(pred_np.shape)
             #print(label_np.shape)
+            
             misc_arr = pred_np==label_np
-            #print(misc)
+            #print(misc_arr)
             #print(misc.shape)
+            
             misc_ind = [i for i in range(0,pred_np.shape[0]) if misc_arr[i] == False]
             #print(misc_ind)
             #print(misc_ind[0])
+            #exit()
             #misc_ind = np.where(np.array((preds.cpu().numpy().reshape(self.b_size,)==labels.data.cpu().numpy().reshape(self.b_size,)))==False)[0]
             #print(misc_ind)
             #print(preds.cpu().numpy()==labels.data.cpu().numpy())
