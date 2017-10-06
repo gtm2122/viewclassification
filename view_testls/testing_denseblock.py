@@ -24,7 +24,7 @@ from PIL import Image
 from nndev import model_pip
 from collections import OrderedDict
 import pickle
-
+### WORKING VERSION, NEEDS MORE WORK
 #m = models.densenet161(pretrained=True)
 
 res = models.densenet161(pretrained=True)

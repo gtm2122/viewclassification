@@ -69,6 +69,7 @@ def s_points(img,model_dir,m):
 					#print(z)
 				#print(j)
 				#print(count)
+				#adding layers
 				# if(isinstance(j,nn.Sequential)):
 				# 	print('here')
 				# 	print(j)
