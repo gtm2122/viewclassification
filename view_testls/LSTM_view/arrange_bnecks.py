@@ -1,6 +1,8 @@
 import os
 import shutil
 
+#### Script for arranging each frame into it's video folder
+
 def find_2(s):
 	return [i for i,j in enumerate(s) if j=='_'][-1]
 
@@ -23,6 +25,6 @@ def arrange_data(d):
 
 
 for phase in ['train','test','val']:
-	for c in os.listdir('/data/gabriel/bottleneck_codes/'+phase):
+	for c in os.listdir('/storage/SET2_bnecks/'+phase):
 		if(len(c)==3):
-			arrange_data('/data/gabriel/bottleneck_codes/'+phase+'/'+c)
+			arrange_data('/storage/SET2_bnecks/'+phase+'/'+c)
