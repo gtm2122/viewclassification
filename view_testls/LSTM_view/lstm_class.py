@@ -9,6 +9,8 @@ import torch.nn.functional as F
 
 import random
 
+### This script is essentially the neural network architecture along with wrappers for training and testing
+
 class lstm_proc(nn.Module):
 	def __init__(self,window_len=0,data_dir=0,cache_dir=0,overwrite=0,epochs=10,hidden_dim = 1000,num_views=7,embed_sz=19872,layers=1,dropout = 0):
 		super(lstm_proc,self).__init__()
@@ -173,42 +175,15 @@ def train_net(model_cl):
 	print(all_loss_train)
 	print(len(np.arange(0,model_cl.epochs)))
 	plt.plot(all_loss_train,np.arange(0,model_cl.epochs))
-	plt.savefig('/data/gabriel/train_loss_rnn/train_hidden_dim_'+str(model_cl.layers)+'_loss.png')
+	plt.savefig('/storage/train_val_loss_rnn/train_hidden_dim_'+str(model_cl.layers)+'_loss.png')
 	plt.close()
 	
 	plt.plot(all_loss_val,np.arange(0,model_cl.epochs))
-	plt.savefig('/data/gabriel/train_loss_rnn/val_hidden_dim_'+str(model_cl.layers)+'_loss.png')
+	plt.savefig('/storage/train_val_loss_rnn/val_hidden_dim_'+str(model_cl.layers)+'_loss.png')
 	plt.close()
 	return model_cl,optimizer
 import os
 
-# a = torch.load('/data/gabriel/bottleneck_codes_echo_pre/test/A2C/88_20_/88_20_17.jpg.pth')
-# ddir = '/data/gabriel/bottleneck_codes_echo_pre/'
-
-
-used = []
-
-### varying Hidden dim 
-# for hd in [10,100,1000,10000]:
-# 	used.append(hd)
-# 	bb = lstm_proc(data_dir = '/data/gabriel/bottleneck_codes_echo_pre/',cache_dir = ddir+'/cache.pth',overwrite=True,window_len = -1,hidden_dim = hd,epochs = 1000)
-# 	#print('1')
-# 	m,opt_m = train_net(bb)
-# 	torch.save(bb,'/data/gabriel/bottleneck_codes_echo_pre/saved_model'+str(hd)+'.pth')
-
-
-#### Varying number of layers keeping hidden dim = 1000
-
-#except:
-	# print('MEMORY EXCEEDED')
-	# mem_exceed_hd  = [i for i in [10,100,1000,10000] if i not in used]
-	# for hd in mem_exceed_hd:
-
-	# 	bb = lstm_proc(data_dir = '/data/gabriel/bottleneck_codes_echo_pre/',cache_dir = ddir+'/cache.pth',overwrite=True,window_len = 5,hidden_dim = hd,epochs = 1000)
-	# 	#print('2')
-	# 	m,opt_m = train_net(bb)
-	# 	torch.save(bb,'/data/gabriel/bottleneck_codes_echo_pre/saved_model_mem_exceed'+str(hd)+'.pth')
-	#pass
 
 from scipy import stats
 import pickle
@@ -281,32 +256,3 @@ def test(model_cl,res_dir):
 	print(conf_m_img)
 	print(misc_cl)
 
-hd = 500
-ddir = '/data/gabriel/bottleneck_codes_echo_pre/'
-for l in [2,3,4,5]:
-	used.append(hd)
-	bb = lstm_proc(data_dir = '/data/gabriel/bottleneck_codes_echo_pre/',cache_dir = ddir+'/cache.pth',overwrite=False,window_len = -1,hidden_dim = hd,epochs = 1000,layers = l)
-	#print('1')
-	m,opt_m = train_net(bb)
-	torch.save(bb,'/data/gabriel/bottleneck_codes_echo_pre/saved_model_layers'+str(l)+'.pth')
-
-	m = torch.load('/data/gabriel/bottleneck_codes_echo_pre/saved_model_layers'+str(l)+'.pth')
-
-	test(m,'/data/gabriel/bottleneck_codes_echo_pre/results_saved_model_layers'+str(l)+'.pth')
-
-
-# m=torch.load('/data/gabriel/bottleneck_codes_echo_pre/saved_model1000.pth')
-# print (m.cache_dir)
-# test(m,'/data/gabriel/bottleneck_codes_echo_pre/results_saved_model1000')
-
-# m=torch.load('/data/gabriel/bottleneck_codes_echo_pre/saved_model100.pth')
-# print (m.cache_dir)
-# test(m,'/data/gabriel/bottleneck_codes_echo_pre/results_saved_model100')
-
-# m=torch.load('/data/gabriel/bottleneck_codes_echo_pre/saved_model10.pth')
-# print (m.cache_dir)
-# test(m,'/data/gabriel/bottleneck_codes_echo_pre/results_saved_model10')
-
-# m=torch.load('/data/gabriel/bottleneck_codes_echo_pre/saved_model.pth')
-# print (m.cache_dir)
-# test(m,'/data/gabriel/bottleneck_codes_echo_pre/results_saved_model')
