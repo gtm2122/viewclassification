@@ -12,7 +12,7 @@ import random
 ### This script is essentially the neural network architecture along with wrappers for training and testing
 
 class lstm_proc(nn.Module):
-	def __init__(self,window_len=0,data_dir=0,cache_dir=0,overwrite=0,epochs=10,hidden_dim = 1000,num_views=7,embed_sz=19872,layers=1,dropout = 0):
+	def __init__(self,window_len=0,data_dir=0,cache_dir=0,overwrite=0,epochs=10,hidden_dim = 1000,num_views=15,embed_sz=19872,layers=1,dropout = 0):
 		super(lstm_proc,self).__init__()
 		self.epochs=epochs
 		self.window_len = window_len
@@ -203,7 +203,7 @@ def test(model_cl,res_dir):
 	total_vid = 0
 
 
-	conf_m_vid = np.zeros((7,7))
+	conf_m_vid = np.zeros((15,15))
 	conf_m_img = np.zeros_like(conf_m_vid)
 
 	misc_cl = {}
