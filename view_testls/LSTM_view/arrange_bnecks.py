@@ -25,6 +25,7 @@ def arrange_data(d):
 
 
 for phase in ['train','test','val']:
-	for c in os.listdir('/storage/SET2_bnecks/'+phase):
-		if(len(c)==3):
-			arrange_data('/storage/SET2_bnecks/'+phase+'/'+c)
+	for c in os.listdir('/data/gabriel/SET2_bnecks/'+phase):
+		if('.' not in c):
+			print(c)
+			arrange_data('/data/gabriel/SET2_bnecks/'+phase+'/'+c)
