@@ -91,7 +91,10 @@ class lstm_proc(nn.Module):
 							count= 0
 							for frame in os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid):
 								#print(frame)
+								print(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
+								#with open(os.path.expanduser(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)) as f:
 								img = torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
+								#img = torch.load(f)
 
 								if(self.window_len==-1):
 									img_tensor[count,0,:] = torch.from_numpy(img)
