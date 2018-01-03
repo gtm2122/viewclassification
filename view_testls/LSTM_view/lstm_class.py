@@ -36,7 +36,7 @@ class lstm_proc(nn.Module):
 	def forward(self,x):
 		out1,self.hidden = self.lstm(x.view(self.window_len,1,self.embed_sz),self.hidden)
 		
-		return F.log_softmax(self.cl(out1).view(len(x),-1))
+		return F.log_softmax(self.cl(out1.view(len(x),-1)))
 
 		
 
@@ -117,7 +117,7 @@ class lstm_proc(nn.Module):
 			
 			#for i in os.listdir(self.data_dir):
 
-def train_net(model_cl):
+def train_net(model_cl,multi=0):
 
 	all_data_dic = {'train':model_cl.load_data('train'),'val':model_cl.load_data('val')}
 	
@@ -131,7 +131,12 @@ def train_net(model_cl):
 
 	data_keys = {'train':train_data_keys,'val':val_data_keys}
 	criterion = nn.NLLLoss().cuda()
-	model_cl = model_cl.cuda()
+	if(multi==1):
+
+		model_cl = torch.nn.DataParallel(model_cl,dim=1,device_ids = [0,1,2,3,4,5,6,7]).cuda()
+	else:
+		model_cl = model_cl.cuda()
+
 	optimizer = optim.SGD(model_cl.parameters(),lr=0.005)
 	all_loss_train = []
 	all_loss_val = []
@@ -144,14 +149,18 @@ def train_net(model_cl):
 			for keys in data_keys[phase]:
 				#print(keys)
 				model_cl.zero_grad()
-				model_cl.hidden = (model_cl.init_hidden()[0].cuda(),model_cl.init_hidden()[1].cuda())
+				if(multi==1):
+					model_cl.hidden = (model_cl.init_hidden()[0].cuda(async=False),model_cl.init_hidden()[1].cuda(async=False))
+				else:
+					model_cl.hidden = (model_cl.init_hidden()[0].cuda(),model_cl.init_hidden()[1].cuda())
+				
 				embeds,label = all_data_dic[phase][keys]
 				
 				label = torch.LongTensor(embeds.size(0)).fill_(label[0])
 				
-				embeds = Variable(embeds.cuda())
-				label = Variable(label.cuda())
-
+				embeds = Variable(embeds.cuda(async=False))
+				label = Variable(label.cuda(async=False))
+				#print(embeds)
 				out = model_cl(embeds)
 				
 				loss = criterion(out.view(out.size(0),-1),label)
@@ -177,13 +186,15 @@ def train_net(model_cl):
 	print(len(all_loss_train))
 	print(all_loss_train)
 	print(len(np.arange(0,model_cl.epochs)))
-	plt.plot(all_loss_train,np.arange(0,model_cl.epochs))
-	plt.savefig('/storage/train_val_loss_rnn/train_hidden_dim_'+str(model_cl.layers)+'_loss.png')
-	plt.close()
+	#plt.plot(all_loss_train,np.arange(0,model_cl.epochs))
+	#plt.savefig('/storage/train_val_loss_rnn/train_hidden_dim_'+str(model_cl.layers)+'_loss.png')
+	#plt.close()
+	pickle.dump(all_loss_train,open('/storage/train_val_loss_rnn/train_hidden_dim_'+str(model_cl.layers)+'_loss.pkl','wb'))
+	pickle.dump(all_loss_val,open('/storage/train_val_loss_rnn/val_hidden_dim_'+str(model_cl.layers)+'_loss.pkl','wb'))
 	
-	plt.plot(all_loss_val,np.arange(0,model_cl.epochs))
-	plt.savefig('/storage/train_val_loss_rnn/val_hidden_dim_'+str(model_cl.layers)+'_loss.png')
-	plt.close()
+	#plt.plot(all_loss_val,np.arange(0,model_cl.epochs))
+	#plt.savefig('/storage/train_val_loss_rnn/val_hidden_dim_'+str(model_cl.layers)+'_loss.png')
+	#plt.close()
 	return model_cl,optimizer
 import os
 
@@ -225,13 +236,14 @@ def test(model_cl,res_dir):
 		out = model_cl(embeds)
 		out_cpu = out.cpu()
 		_,pred_lab = torch.max(out_cpu.data,1)
-		
+		#print(pred_lab)
 		for i in range(0,pred_lab.size(0)):
 			# print(type(i))
 			# print(type(label[i]))
 			# print(type(pred_lab[i]))
-
-			conf_m_img[label.numpy().astype(int)[i],pred_lab[i]]+=1
+			#print(type(pred_lab[i]))
+			#print(pred_lab[i][0])
+			conf_m_img[label.numpy().astype(int)[i],pred_lab[i][0]]+=1
 
 		pred_vid = stats.mode(pred_lab.numpy(),axis=None)
 		#print(pred_vid)
@@ -249,11 +261,12 @@ def test(model_cl,res_dir):
 		#is_eq =	torch.eq(pred_lab,out_cpu.data).numpy()
 
 		#img_acc+=torch.sum(torch.eq(label,out_cpu.data))
-	m_name = res_dir[res_dir.find('saved_model'):res_dir.find('.pth')+1]
-
-	pickle.dump(conf_m_vid,open(res_dir+'/'+m_name+'_video_conf_m.pkl','wb'))
-	pickle.dump(conf_m_img,open(res_dir+'/'+m_name+'_image_conf_m.pkl','wb'))
-	pickle.dump(misc_cl,open(res_dir+'/'+m_name+'_misc_videos.pkl','wb'))
+	m_name = res_dir[res_dir.find('s_lstm'):res_dir.find('.pth')]
+	#print(res_dir)
+	print(m_name)
+	pickle.dump(conf_m_vid,open(res_dir[:res_dir.find('s_lstm')]+'/'+m_name+'_video_conf_m.pkl','wb'))
+	pickle.dump(conf_m_img,open(res_dir[:res_dir.find('s_lstm')]+'/'+m_name+'_image_conf_m.pkl','wb'))
+	pickle.dump(misc_cl,open(res_dir[:res_dir.find('s_lstm')]+'/'+m_name+'_misc_videos.pkl','wb'))
 
 	print(conf_m_vid)
 	print(conf_m_img)

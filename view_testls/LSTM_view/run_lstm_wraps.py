@@ -19,6 +19,7 @@ used = []
 ### varying Hidden dim and layers
 for hd in [10,100,1000,2000]:
 	for l in [2,3,4,5]:
+#<<<<<<< HEAD
 		#try:
 		used.append(hd)
 		bb = lstm_proc(num_views=15,data_dir = '/data/gabriel/SET2_bnecks/',cache_dir = ddir+'/cache.pth',overwrite=True,window_len = -1,hidden_dim = hd,epochs = 1000,layers=l)
@@ -30,17 +31,32 @@ for hd in [10,100,1000,2000]:
 		# except:
 		# 	print('error at '+str(hd)+'_'+str(l))
 		# 	break
+# =======
+# 		try:
+# 			used.append(hd)
+# 			bb = lstm_proc(num_views=15,data_dir = '/storage/SET2_bnecks/',cache_dir = ddir+'/cache.pth',overwrite=True,window_len = -1,hidden_dim = hd,epochs = 1000,layers=l)
+# 			#print('1')
+# 			#print('training')
+# 			if(hd > 10 or l > 2):
+# 				m,opt_m = train_net(bb)
+# 				torch.save(bb,'/storage/saved_lstm/s_lstm_hd_'+str(hd)+'_layers_'+str(l)+'.pth')
+# 			m = torch.load('/storage/saved_lstm/s_lstm_hd_'+str(hd)+'_layers_'+str(l)+'.pth')
+# 			test(m,'/storage/saved_lstm/s_lstm_hd_'+str(hd)+'_layers_'+str(l)+'.pth')
+# 		except:
+# 			print('error at '+str(hd)+'_'+str(l))
+# 			break
+# >>>>>>> 02ce02b1c19e0178b2474ae3b031491bbe364991
 """
 hd = 500
 ddir = '/storage/SET2_bnecks/'
 for l in [2,3,4,5]:
-	used.append(hd)
-	bb = lstm_proc(data_dir = '/storage/SET2_bnecks/',cache_dir = ddir+'/cache.pth',overwrite=False,window_len = -1,hidden_dim = hd,epochs = 1000,layers = l)
+	#used.append(hd)
+	#bb = lstm_proc(data_dir = '/storage/SET2_bnecks/',cache_dir = ddir+'/cache.pth',overwrite=False,window_len = -1,hidden_dim = hd,epochs = 1000,layers = l)
 	#print('1')
-	m,opt_m = train_net(bb)
-	torch.save(bb,'/storage/saved_lstm/saved_model_layers'+str(l)+'.pth')
+	#m,opt_m = train_net(bb)
+	#torch.save(bb,'/storage/saved_lstm/saved_model_layers'+str(l)+'.pth')
 
-	m = torch.load('/storage/saved_lstm/saved_model_layers'+str(l)+'.pth')
+	#m = torch.load('/storage/saved_lstm/saved_model_layers'+str(l)+'.pth')
 
 	test(m,'/storage/saved_lstm/results_saved_model_layers'+str(l)+'.pth')
 
