@@ -8,7 +8,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 import random
-
+#torch.nn.Module.dump_patches=True
 ### This script is essentially the neural network architecture along with wrappers for training and testing
 
 class lstm_proc(nn.Module):
@@ -35,8 +35,15 @@ class lstm_proc(nn.Module):
 
 	def forward(self,x):
 		out1,self.hidden = self.lstm(x.view(self.window_len,1,self.embed_sz),self.hidden)
-		
-		return F.log_softmax(self.cl(out1.view(len(x),-1)))
+		#print(out1)
+		#exit()
+		#print(out1.size())
+		#print(lex(x))
+		#print(F.log_softmax(self.cl(out1.view(len(x),-1)),dim=0))
+		#print(F.log_softmax(self.cl(out1).view(len(x),-1),dim=1))
+		#exit()
+		#print(self.cl(out1))
+		return F.log_softmax(self.cl(out1.view(len(x),-1)),dim=1)
 
 		
 
@@ -75,7 +82,7 @@ class lstm_proc(nn.Module):
 			return torch.load(self.cache_dir)
 		else:
 			max_f = self.window_len
-			
+			#print('here')
 			#print(max_f)
 			data_dic = {}
 			for cl in os.listdir(self.data_dir+'/'+phase+'/'):
@@ -88,34 +95,51 @@ class lstm_proc(nn.Module):
 								max_f  = len(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid))
 								#print(max_f)
 							img_tensor = torch.zeros(max_f,1,self.embed_sz)
-							count= 0
-							for frame in os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid):
-								#print(frame)
-								print(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
-								#with open(os.path.expanduser(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)) as f:
-								img = torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
-								#img = torch.load(f)
+							count= 1
+							if(len(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid))>0):
+								for frame in os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid):
+									#print(frame)
+									#print(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
+									#print(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
+									#with open(os.path.expanduser(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)) as f:
+									
+									img = torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
+									#img = torch.load(f)
 
-								if(self.window_len==-1):
-									img_tensor[count,0,:] = torch.from_numpy(img)
-								else:
-									img_tensor[count % max_f,0,:] = torch.from_numpy(img)						
-								count+=1
+									if(self.window_len==-1):
+										# if(torch.from_numpy(img).size(0) is None):
+										# 	print(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
+										img_tensor[count-1,0,:] = torch.from_numpy(img)
+									else:
+										img_tensor[count-1 % max_f,0,:] = torch.from_numpy(img)						
+									count+=1
 
-								if(count>0 and not(count%max_f) and self.window_len>0):
-									#print(vid)
-									data_dic[vid+str(count)] = (img_tensor,self.label_to_ix(cl))
-									img_tensor = torch.zeros(max_f,1,self.embed_sz)
-			
-							if(self.window_len==-1):
-								data_dic[vid+str(count)] = (img_tensor,self.label_to_ix(cl))
-								img_tensor = torch.zeros(max_f,1,self.embed_sz)
-			
+									if(count>0 and not(count%max_f) and self.window_len>0):
+										#print(vid)
+										data_dic[vid+str(count)] = (img_tensor,self.label_to_ix(cl),cl)
+										img_tensor = torch.zeros(max_f,1,self.embed_sz)
+									#print(img_tensor)
+									#print(count)
+									#last=frame
+								if(vid+str(max_f) not in data_dic):
+									data_dic[vid+str(max_f)] = (img_tensor,self.label_to_ix(cl),cl,self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/')		
+							#if(self.window_len==-1):
+								#print(count)
+								#exit()
+								#data_dic[vid+str(count)] = (img_tensor,self.label_to_ix(cl))
+								#img_tensor = torch.zeros(max_f,1,self.embed_sz)
+							
 			torch.save(data_dic,self.cache_dir)
 			return data_dic
 			#img_tensor = torch.zeros(max_f,)
 			
 			#for i in os.listdir(self.data_dir):
+
+
+from torch.optim import lr_scheduler
+
+
+
 
 def train_net(model_cl,multi=0):
 
@@ -131,6 +155,7 @@ def train_net(model_cl,multi=0):
 
 	data_keys = {'train':train_data_keys,'val':val_data_keys}
 	criterion = nn.NLLLoss().cuda()
+	#print(data_keys['train'])
 	if(multi==1):
 
 		model_cl = torch.nn.DataParallel(model_cl,dim=1,device_ids = [0,1,2,3,4,5,6,7]).cuda()
@@ -140,29 +165,60 @@ def train_net(model_cl,multi=0):
 	optimizer = optim.SGD(model_cl.parameters(),lr=0.005)
 	all_loss_train = []
 	all_loss_val = []
+	num_to_lab = {}
+	#print(model_cl.epochs)
+	epoch_list=[]
+	best_val_acc = 0
+
+	exp_lr_scheduler = lr_scheduler.StepLR(optimizer,step_size=30,gamma=0.1)
+
 	for epoch in range(0,model_cl.epochs):
 		running_loss_train = 0
 		running_loss_val = 0
-		
+		#print(epoch)
+		#epoch_list.append(epoch)
+		conf_m_vid = np.zeros((model_cl.num_views,model_cl.num_views))
+		conf_m_img = np.zeros_like(conf_m_vid)
+		print('model = ', 'layers_'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout))
+		print('epoch = ',epoch)
+
 		for phase in ['train','val']:
 		#for phase in ['train','val']:
+			#print(phase)
+			if(phase=='train'):
+				exp_lr_scheduler.step()
+				model_cl.train(True)
+			else:
+				model_cl.train(False)
 			for keys in data_keys[phase]:
 				#print(keys)
+				#print(data_keys[phase])
+
 				model_cl.zero_grad()
 				if(multi==1):
 					model_cl.hidden = (model_cl.init_hidden()[0].cuda(async=False),model_cl.init_hidden()[1].cuda(async=False))
 				else:
 					model_cl.hidden = (model_cl.init_hidden()[0].cuda(),model_cl.init_hidden()[1].cuda())
 				
-				embeds,label = all_data_dic[phase][keys]
-				
+				embeds,label,label_name,name_file = all_data_dic[phase][keys]
+				if(label not in num_to_lab):
+					num_to_lab[label.numpy()[0]] = label_name 
+				#print(keys)
+				#print(embeds)
+				#print(label_name)
+				#print(label)
+				#print(name_file)
+				#print(phase)
+				#print(label)
+				#print(label.size())
+				#print(keys)
 				label = torch.LongTensor(embeds.size(0)).fill_(label[0])
 				
-				embeds = Variable(embeds.cuda(async=False))
-				label = Variable(label.cuda(async=False))
+				embeds = Variable(embeds.cuda())
+				label = Variable(label.cuda())
 				#print(embeds)
 				out = model_cl(embeds)
-				
+				#print(out)
 				loss = criterion(out.view(out.size(0),-1),label)
 
 				if(phase =='train'):
@@ -171,31 +227,71 @@ def train_net(model_cl,multi=0):
 					optimizer.step()
 				if(phase=='val'):
 					running_loss_val+= loss.cpu().data.numpy()[0]
-					#optimizer.step()
 
+					pred_img,pred_img_idx = out.max(dim=1)
+					#print(pred_img_idx)
+					#exit()
+					pred_vid = stats.mode(pred_img_idx.cpu().data.numpy())[0]
+					for pred_img_val in pred_img_idx.cpu().data.numpy().astype(int):
+						#print(pred_img_val)
+						conf_m_img[label.cpu().data[0],pred_img_val]+=1
+					conf_m_vid[label.cpu().data[0],pred_vid]+=1
+					#optimizer.step()
+					
 				del(out)
 				del(loss)
 				del(label)
 				del(embeds)
-		all_loss_train.append(running_loss_train)
-		all_loss_val.append(running_loss_val)
+			if(epoch not in epoch_list):
+				epoch_list.append(epoch)
+			
+			
+			if(phase=='train'):
+				all_loss_train.append(running_loss_train)
+				plt.plot(epoch_list,all_loss_train)
+				plt.savefig('/data/gabriel/train_loss_rnn/train_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'_loss.png')
+				plt.close()
+				#print(epoch_list)
+				#print(all_loss_train)
+				#pickle.dump(all_loss_train,open('/data/gabriel/train_val_loss_rnn/train_val_loss_rnn/new_train_hidden_dim_'+str(model_cl.layers)+'_loss.pkl','wb'))
+				#pickle.dump(all_loss_val,open('/data/gabriel/train_val_loss_rnn/train_val_loss_rnn/new_val_hidden_dim_'+str(model_cl.layers)+'_loss.pkl','wb'))
+			else:
+				all_loss_val.append(running_loss_val)		
+				#print(epoch_list)
+				#print(all_loss_train)
+				vid_acc = conf_m_vid.diagonal().sum()/conf_m_vid.sum()
+				img_acc = conf_m_img.diagonal().sum()/conf_m_img.sum()
+				print('video accuracy =',vid_acc)
+				print('image accuracy =',img_acc)
+
+				if(img_acc >= best_val_acc):
+					best_val_acc = img_acc
+					best_model_wts = model_cl.state_dict()
+					print('best_epoch = ',epoch)
+				plt.plot(epoch_list,all_loss_val)
+
+
+				plt.savefig('/data/gabriel/train_loss_rnn/val_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'_loss.png')
+				plt.close()
+
 
 		random.shuffle(train_data_keys)
 		random.shuffle(val_data_keys)
 		data_keys = {'train':train_data_keys,'val':val_data_keys}
-	print(len(all_loss_train))
-	print(all_loss_train)
-	print(len(np.arange(0,model_cl.epochs)))
+	#print(len(all_loss_train))
+	#print(all_loss_train)
+	#print(len(np.arange(0,model_cl.epochs)))
 	#plt.plot(all_loss_train,np.arange(0,model_cl.epochs))
-	#plt.savefig('/storage/train_val_loss_rnn/train_hidden_dim_'+str(model_cl.layers)+'_loss.png')
+	#plt.savefig('/data/gabriel/train_loss_rnn/new_train_hidden_dim_'+str(model_cl.layers)+'_loss.png')
 	#plt.close()
-	pickle.dump(all_loss_train,open('/storage/train_val_loss_rnn/train_hidden_dim_'+str(model_cl.layers)+'_loss.pkl','wb'))
-	pickle.dump(all_loss_val,open('/storage/train_val_loss_rnn/val_hidden_dim_'+str(model_cl.layers)+'_loss.pkl','wb'))
+	#pickle.dump(all_loss_train,open('/data/gabriel/train_val_loss_rnn/train_val_loss_rnn/new_train_hidden_dim_'+str(model_cl.layers)+'_loss.pkl','wb'))
+	#pickle.dump(all_loss_val,open('/data/gabriel/train_val_loss_rnn/train_val_loss_rnn/new_val_hidden_dim_'+str(model_cl.layers)+'_loss.pkl','wb'))
 	
 	#plt.plot(all_loss_val,np.arange(0,model_cl.epochs))
-	#plt.savefig('/storage/train_val_loss_rnn/val_hidden_dim_'+str(model_cl.layers)+'_loss.png')
+	#plt.savefig('/data/gabriel/train_loss_rnn/train_val_loss_rnn/val_hidden_dim_'+str(model_cl.layers)+'_loss.png')
 	#plt.close()
-	return model_cl,optimizer
+
+	return model_cl.load_state_dict(best_model_wts),optimizer,num_to_lab
 import os
 
 
@@ -217,14 +313,14 @@ def test(model_cl,res_dir):
 	total_vid = 0
 
 
-	conf_m_vid = np.zeros((15,15))
+	conf_m_vid = np.zeros((model_cl.num_views,model_cl.num_views))
 	conf_m_img = np.zeros_like(conf_m_vid)
 
 	misc_cl = {}
 
 	for keys in test_data_keys:
 		#print(keys)
-		embeds,label = test_dic['test'][keys]
+		embeds,label,label_name,name_file = test_dic['test'][keys]
 
 		embeds = Variable(embeds.cuda())
 		
@@ -234,8 +330,10 @@ def test(model_cl,res_dir):
 		#label = Variable(label.cuda())
 		#print(label)
 		out = model_cl(embeds)
+		#print(out)
 		out_cpu = out.cpu()
 		_,pred_lab = torch.max(out_cpu.data,1)
+		#print(pred_lab)
 		#print(pred_lab)
 		for i in range(0,pred_lab.size(0)):
 			# print(type(i))
@@ -243,11 +341,13 @@ def test(model_cl,res_dir):
 			# print(type(pred_lab[i]))
 			#print(type(pred_lab[i]))
 			#print(pred_lab[i][0])
-			conf_m_img[label.numpy().astype(int)[i],pred_lab[i][0]]+=1
+			conf_m_img[label.numpy().astype(int)[i],pred_lab[i]]+=1
 
 		pred_vid = stats.mode(pred_lab.numpy(),axis=None)
 		#print(pred_vid)
 		#print(pred_lab)
+		#print(ac_label)
+		#print(pred_vid[0])
 		conf_m_vid[ac_label,pred_vid[0]]+=1
 
 		if(pred_vid[0]!=ac_label):
@@ -264,11 +364,14 @@ def test(model_cl,res_dir):
 	m_name = res_dir[res_dir.find('s_lstm'):res_dir.find('.pth')]
 	#print(res_dir)
 	print(m_name)
-	pickle.dump(conf_m_vid,open(res_dir[:res_dir.find('s_lstm')]+'/'+m_name+'_video_conf_m.pkl','wb'))
-	pickle.dump(conf_m_img,open(res_dir[:res_dir.find('s_lstm')]+'/'+m_name+'_image_conf_m.pkl','wb'))
-	pickle.dump(misc_cl,open(res_dir[:res_dir.find('s_lstm')]+'/'+m_name+'_misc_videos.pkl','wb'))
+	pickle.dump(conf_m_vid,open(res_dir+'/'+m_name+'_video_conf_m.pkl','wb'))
+	pickle.dump(conf_m_img,open(res_dir+'/'+m_name+'_image_conf_m.pkl','wb'))
+	pickle.dump(misc_cl,open(res_dir+'/'+m_name+'_misc_videos.pkl','wb'))
 
 	print(conf_m_vid)
+	
 	print(conf_m_img)
 	print(misc_cl)
 
+	print('video accuracy = ',conf_m_vid.diagonal().sum()/conf_m_vid.sum())
+	print('image accuracy = ',conf_m_img.diagonal().sum()/conf_m_img.sum())
