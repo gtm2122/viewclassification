@@ -10,18 +10,24 @@ import torch.nn.functional as F
 import random
 #torch.nn.Module.dump_patches=True
 ### This script is essentially the neural network architecture along with wrappers for training and testing
+import re
+
+
 
 class lstm_proc(nn.Module):
-	def __init__(self,window_len=0,data_dir=0,cache_dir=0,overwrite=0,epochs=10,hidden_dim = 1000,num_views=15,embed_sz=19872,layers=1,dropout = 0):
+	def __init__(self,window_len=0,data_dir=0,cache_dir=0,overwrite=0,epochs=10,hidden_dim = 1000,num_views=15,embed_sz=19872,layers=1,dropout = 0,batch_size=1):
 		super(lstm_proc,self).__init__()
 		self.epochs=epochs
-		self.window_len = window_len
+		if(window_len==0):
+			self.window_len = window_len-1
+		else:
+			self.window_len=window_len
 		self.cache_dir = cache_dir
 		self.hidden_dim=hidden_dim
 		self.num_views=num_views
 		self.embed_sz = embed_sz
 		self.data_dir = data_dir
-		
+		self.batch_size=batch_size
 		self.ow = overwrite
 		self.labels = [i for i in os.listdir(self.data_dir+'/test/') if '.p' not in i]
 		self.loss_fn = nn.NLLLoss()
@@ -34,7 +40,7 @@ class lstm_proc(nn.Module):
 	# 	return (Variable(torch.zeros(1,1,self.hidden_dim)),Variable(torch.zeros(1,1,self.hidden_dim)))
 
 	def forward(self,x):
-		out1,self.hidden = self.lstm(x.view(self.window_len,1,self.embed_sz),self.hidden)
+		out1,self.hidden = self.lstm(x.view(self.window_len,self.batch_size,self.embed_sz),self.hidden)
 		#print(out1)
 		#exit()
 		#print(out1.size())
@@ -48,7 +54,7 @@ class lstm_proc(nn.Module):
 		
 
 	def init_hidden(self):
-		return (Variable(torch.zeros(self.layers,1,self.hidden_dim)),Variable(torch.zeros(self.layers,1,self.hidden_dim)))
+		return (Variable(torch.zeros(self.layers,self.batch_size,self.hidden_dim)),Variable(torch.zeros(self.layers,self.batch_size,self.hidden_dim)))
 	@staticmethod
 	def find_max_frame(phase_path,phase):
 		
@@ -78,57 +84,119 @@ class lstm_proc(nn.Module):
 		#max_f = find_max_frame(self.data_dir+'/'+phase)
 
 
+
+
 		if(os.path.exists(self.cache_dir) and not(self.ow)):
 			return torch.load(self.cache_dir)
 		else:
-			max_f = self.window_len
-			#print('here')
-			#print(max_f)
-			data_dic = {}
-			for cl in os.listdir(self.data_dir+'/'+phase+'/'):
-				if '.p' not in phase and '.p' not in cl:
-					for vid in os.listdir(self.data_dir+'/'+phase+'/'+cl):
-						if '.p' not in vid:
-							
-							if(self.window_len == -1):
 
-								max_f  = len(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid))
-								#print(max_f)
-							img_tensor = torch.zeros(max_f,1,self.embed_sz)
-							count= 1
-							if(len(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid))>0):
-								for frame in os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid):
-									#print(frame)
-									#print(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
-									#print(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
-									#with open(os.path.expanduser(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)) as f:
-									
-									img = torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
-									#img = torch.load(f)
+			### This is for batch_size = 1 :
 
-									if(self.window_len==-1):
-										# if(torch.from_numpy(img).size(0) is None):
-										# 	print(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
+			if self.batch_size == 1: ### This refers to num batches, not number in a batch:
+
+				 ### BECAUSE shape is (-1 , 1, 19872)
+				#print('here')
+				#print(max_f)
+				data_dic = {}
+				for cl in os.listdir(self.data_dir+'/'+phase+'/'):
+					if '.p' not in phase and '.p' not in cl:
+						for vid in os.listdir(self.data_dir+'/'+phase+'/'+cl):
+							if '.p' not in vid:
+								
+								if(self.window_len <=0):
+
+									max_f  = len(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid))
+									#print(max_f)
+
+								img_tensor = torch.zeros(max_f,1,self.embed_sz)
+								count= 1
+								if(len(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid))>0):
+									sorted_frame_names = sorted(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'),key = lambda s:[int(t) if t.isdigit() else t.lower() for t in re.split('(\d+)',s)])
+									for frame in sorted_frame_names:
+										#print(sorted_frame_names)
+										img = torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
+										
+										
 										img_tensor[count-1,0,:] = torch.from_numpy(img)
-									else:
-										img_tensor[count-1 % max_f,0,:] = torch.from_numpy(img)						
-									count+=1
+										
+										count+=1
 
-									if(count>0 and not(count%max_f) and self.window_len>0):
-										#print(vid)
-										data_dic[vid+str(count)] = (img_tensor,self.label_to_ix(cl),cl)
-										img_tensor = torch.zeros(max_f,1,self.embed_sz)
-									#print(img_tensor)
-									#print(count)
-									#last=frame
-								if(vid+str(max_f) not in data_dic):
-									data_dic[vid+str(max_f)] = (img_tensor,self.label_to_ix(cl),cl,self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/')		
-							#if(self.window_len==-1):
-								#print(count)
-								#exit()
-								#data_dic[vid+str(count)] = (img_tensor,self.label_to_ix(cl))
-								#img_tensor = torch.zeros(max_f,1,self.embed_sz)
-							
+										if(count>0 and not(count%max_f) and self.window_len>0):
+											#print(vid)
+											data_dic[vid+str(count)] = (img_tensor,self.label_to_ix(cl),cl)
+											img_tensor = torch.zeros(max_f,1,self.embed_sz)
+									
+									if(vid+str(max_f) not in data_dic):
+										data_dic[vid+str(max_f)] = (img_tensor,self.label_to_ix(cl),cl,self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/')		
+								
+			### This part for non-zero batch size
+			else:
+				for cl in os.listdir(self.data_dir+'/'+phase+'/'):
+
+					if '.p' not in phase and '.p' not in cl:
+						for vid in os.listdir(self.data_dir+'/'+phase+'/'+cl):
+							if '.p' not in vid:
+								num_frames = len(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid))
+								sorted_frame_names = sorted(os.listdir(self.data_dir+'/'+phase+'/'+cl),key = lambda s:[int(t) if t.isdigit() else t.lower() for t in re.split('(\d+)',s)])
+									
+								assert self.window_len>=0,"self.window_len should be atleast 0"
+
+								## setting max seq_len*batches = 15
+								## minimum num of frames in test/train/val = 13 , calculated using check.largest_folder()
+								max_frame_batches = 15
+
+
+								if(num_frames<max_frame_batches):
+
+									batched_tensor = torch.zeros(self.window_len,self.batch_size,self.embed_sz)
+
+									for num in range(0,self.batch_size):
+										count = 0
+										for frame in sorted_frame_names[num*self.window_len:(num+1)*self.window_len]:
+											batched_tensor[count,num,:] = torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
+											count+=1
+
+									if(vid+str((num+1)*self.window_len)):
+										data_dic[vid+str((num)*self.window_len)] = (batched_tensor,self.label_to_ix(cl),cl,self.data_dir+'/'+phase+'/'+cl+vid+'/')
+
+								else:
+									num_batches = np.ceil(num_frames/self.window_len)
+
+									# TODO experiment with zero padding instead of windowing in last frames
+									# Posssible TODO - possible image augmentation would be to use moving windows with step=1 rather than step = self.window_len 
+									
+									num_zeros = num_batches*np.ceil(num_frames/self.window_len) - num_frames
+
+									### Batches are divided into 1:self.window_len , when it reaches the remainder it the batch will comprise of the last (self.window_len) number
+									### of frames, with the other two batches being zero vectors. The loss function will be modified to average along this non zero batch only.
+
+									for mega_batch_num in range(0,num_batches//self.batch_size):
+										batched_tensor = torch.zeros(self.window_len,self.batch_size,self.embed_sz)
+										
+										for num in range(0,self.batch_size):
+											count=0
+											for frame in sorted_frame_names[(num+np.ceil(num_batches//self.batch_size)*mega_batch_num)*self.window_len:(num+1+np.ceil(num_batches//self.batch_size)*mega_batch_num)*self.window_len]:
+												batched_tensor[count,num,:] = torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
+												count+=1
+
+										if(vid+str((num+1)*self.window_len)):
+											data_dic[vid+str((num+1)*self.window_len)] = (batched_tensor,self.label_to_ix(cl),cl,self.data_dir+'/'+phase+'/'+cl+vid+'/')
+
+									### taking the last 5 frames and then zero padding rest of the batch
+									if(vid+str(num_frames-self.window_len)):
+										batched_tensor = torch.zeros(self.window_len,self.batch_size,self.embed_sz)
+										count = 0
+										for frame in sorted_frame_names[len(sorted_frame_names)-self.window_len:]:
+											batched_tensor[count,0,:] = torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
+											count+=1
+
+										if(vid+str((num+1)*self.window_len)):
+											data_dic[vid+str((num+1)*self.window_len)] = (batched_tensor,self.label_to_ix(cl),cl,self.data_dir+'/'+phase+'/'+cl+vid+'/')
+
+								### Computed based on min frames in train_set. I chose value = highest prime factor, but can be increased.
+
+
+
 			torch.save(data_dic,self.cache_dir)
 			return data_dic
 			#img_tensor = torch.zeros(max_f,)
@@ -162,7 +230,7 @@ def train_net(model_cl,multi=0):
 	else:
 		model_cl = model_cl.cuda()
 
-	optimizer = optim.SGD(model_cl.parameters(),lr=0.005)
+	op = optim.SGD(model_cl.parameters(),lr=0.005)
 	all_loss_train = []
 	all_loss_val = []
 	num_to_lab = {}
@@ -170,9 +238,11 @@ def train_net(model_cl,multi=0):
 	epoch_list=[]
 	best_val_acc = 0
 
-	exp_lr_scheduler = lr_scheduler.StepLR(optimizer,step_size=30,gamma=0.1)
+	exp_lr_scheduler = lr_scheduler.MultiStepLR(optimizer=op,milestones=[25],gamma=0.1/3)
 
 	for epoch in range(0,model_cl.epochs):
+	#for epoch in range(0,1):
+	
 		running_loss_train = 0
 		running_loss_val = 0
 		#print(epoch)
@@ -212,8 +282,13 @@ def train_net(model_cl,multi=0):
 				#print(label)
 				#print(label.size())
 				#print(keys)
-				label = torch.LongTensor(embeds.size(0)).fill_(label[0])
-				
+				if(model_cl.batch_size==1):
+					label = torch.LongTensor(embeds.size(0)).fill_(label[0])
+				else:
+					label_tensor = torch.zeros(embeds.size(0),embeds.size(1))
+					label_tensor = label.fill_(label[0])
+					label = label_tensor
+								
 				embeds = Variable(embeds.cuda())
 				label = Variable(label.cuda())
 				#print(embeds)
@@ -224,7 +299,7 @@ def train_net(model_cl,multi=0):
 				if(phase =='train'):
 					loss.backward()
 					running_loss_train+= loss.cpu().data.numpy()[0]
-					optimizer.step()
+					op.step()
 				if(phase=='val'):
 					running_loss_val+= loss.cpu().data.numpy()[0]
 
@@ -266,7 +341,7 @@ def train_net(model_cl,multi=0):
 
 				if(img_acc >= best_val_acc):
 					best_val_acc = img_acc
-					best_model_wts = model_cl.state_dict()
+					best_model = model_cl
 					print('best_epoch = ',epoch)
 				plt.plot(epoch_list,all_loss_val)
 
@@ -290,8 +365,8 @@ def train_net(model_cl,multi=0):
 	#plt.plot(all_loss_val,np.arange(0,model_cl.epochs))
 	#plt.savefig('/data/gabriel/train_loss_rnn/train_val_loss_rnn/val_hidden_dim_'+str(model_cl.layers)+'_loss.png')
 	#plt.close()
-
-	return model_cl.load_state_dict(best_model_wts),optimizer,num_to_lab
+	#print(model_cl.load_state_dict(best_model_wts))
+	return model_cl,op,num_to_lab
 import os
 
 
