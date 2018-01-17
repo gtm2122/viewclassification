@@ -24,25 +24,36 @@ def GCD(a,b):
 	else:
 		return GCD(b,a%b)
 from functools import reduce
+
+
 def largest_folder():
+	avg = 0
+	sd = []
+	count=0
 	uniq_len = {}
-	for i in os.listdir('/data/gabriel/bottleneck_codes_echo_pre/'):
+	
+	for i in ['test','train','val']:
 		for j in os.listdir('/data/gabriel/bottleneck_codes_echo_pre/'+i):
 			if('.pkl' not in j):
 				for k in os.listdir('/data/gabriel/bottleneck_codes_echo_pre/'+i+'/'+j):
 					#print(k)
 					if('.p' not in k):
 						num =len(os.listdir('/data/gabriel/bottleneck_codes_echo_pre/'+'/'+i+'/'+j+'/'+k))
-
+						avg+=num
 						uniq_len[i+'/'+j+'/'+k] = num
-					
+						count+=1
+						sd+=[num]					
 	def loc_fun(k,dic = uniq_len):
 		return dic[k]
 	sorted_keys = sorted(uniq_len,key=loc_fun,reverse=True)
-	#print(uniq_len.keys())
+	#	print(uniq_len.keys())
 	print(reduce(lambda x,y : GCD(x,y), [uniq_len[i] for i in uniq_len]) )
-
-	# for i in range(0,len(sorted_keys)):
+	print(np.std(np.array(sd)))
+	print(avg/count)
+	print(min(list(uniq_len.keys()),key=lambda x: uniq_len[x]))
+	print(max(list(uniq_len.keys()),key=lambda x: uniq_len[x]))
+	
+	#	 for i in range(0,len(sorted_keys)):
 	# 	print(sorted_keys[i],uniq_len[sorted_keys[i]])
 
 largest_folder()
