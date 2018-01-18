@@ -15,26 +15,30 @@ import re
 
 
 class lstm_proc(nn.Module):
-	def __init__(self,window_len=0,data_dir=0,cache_dir=0,overwrite=0,epochs=10,hidden_dim = 1000,num_views=15,embed_sz=19872,layers=1,dropout = 0,batch_size=1):
+	def __init__(self,window_len=0,data_dir=0,cache_dir=0,overwrite=0,epochs=10,hidden_dim = 1000,num_views=15,
+		embed_sz=19872,layers=1,dropout = 0,batch_size=1,lr = 0.005,gpu_num=0,step_lr = [50]):
 		super(lstm_proc,self).__init__()
 		self.epochs=epochs
 		if(window_len==0):
 			self.window_len = window_len-1
 		else:
 			self.window_len=window_len
+		self.lr = lr
+		self.step_lr = step_lr
 		self.cache_dir = cache_dir
 		self.hidden_dim=hidden_dim
+		self.gpu_num = gpu_num
 		self.num_views=num_views
 		self.embed_sz = embed_sz
 		self.data_dir = data_dir
-		self.batch_size=batch_size
+		self.batch_size=int(batch_size)
 		self.ow = overwrite
 		self.labels = [i for i in os.listdir(self.data_dir+'/test/') if '.p' not in i]
 		self.loss_fn = nn.NLLLoss()
 		self.layers = layers
 		self.dropout = dropout
 		self.lstm = nn.LSTM(input_size = self.embed_sz,hidden_size = self.hidden_dim,num_layers = self.layers, dropout = self.dropout)
-		self.cl = nn.Linear(self.hidden_dim,self.num_views)
+		self.cl = nn.Linear(self.hidden_dim*self.batch_size,self.num_views)
 		self.hidden = self.init_hidden()
 	# def init_hidden(self):
 	# 	return (Variable(torch.zeros(1,1,self.hidden_dim)),Variable(torch.zeros(1,1,self.hidden_dim)))
@@ -42,6 +46,8 @@ class lstm_proc(nn.Module):
 	def forward(self,x):
 		out1,self.hidden = self.lstm(x.view(self.window_len,self.batch_size,self.embed_sz),self.hidden)
 		#print(out1)
+		#print(out1[-1])
+		#exit()
 		#exit()
 		#print(out1.size())
 		#print(lex(x))
@@ -91,13 +97,13 @@ class lstm_proc(nn.Module):
 		else:
 
 			### This is for batch_size = 1 :
-
+			data_dic = {}
 			if self.batch_size == 1: ### This refers to num batches, not number in a batch:
 
 				 ### BECAUSE shape is (-1 , 1, 19872)
 				#print('here')
 				#print(max_f)
-				data_dic = {}
+				
 				for cl in os.listdir(self.data_dir+'/'+phase+'/'):
 					if '.p' not in phase and '.p' not in cl:
 						for vid in os.listdir(self.data_dir+'/'+phase+'/'+cl):
@@ -137,7 +143,7 @@ class lstm_proc(nn.Module):
 						for vid in os.listdir(self.data_dir+'/'+phase+'/'+cl):
 							if '.p' not in vid:
 								num_frames = len(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid))
-								sorted_frame_names = sorted(os.listdir(self.data_dir+'/'+phase+'/'+cl),key = lambda s:[int(t) if t.isdigit() else t.lower() for t in re.split('(\d+)',s)])
+								sorted_frame_names = sorted(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid),key = lambda s:[int(t) if t.isdigit() else t.lower() for t in re.split('(\d+)',s)])
 									
 								assert self.window_len>=0,"self.window_len should be atleast 0"
 
@@ -153,7 +159,7 @@ class lstm_proc(nn.Module):
 									for num in range(0,self.batch_size):
 										count = 0
 										for frame in sorted_frame_names[num*self.window_len:(num+1)*self.window_len]:
-											batched_tensor[count,num,:] = torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
+											batched_tensor[count,num,:] = torch.from_numpy(torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame))
 											count+=1
 
 									if(vid+str((num+1)*self.window_len)):
@@ -169,29 +175,31 @@ class lstm_proc(nn.Module):
 
 									### Batches are divided into 1:self.window_len , when it reaches the remainder it the batch will comprise of the last (self.window_len) number
 									### of frames, with the other two batches being zero vectors. The loss function will be modified to average along this non zero batch only.
-
-									for mega_batch_num in range(0,num_batches//self.batch_size):
+									num_mega_batches = int(num_batches)//self.batch_size
+									for mega_batch_num in range(0,num_mega_batches):
 										batched_tensor = torch.zeros(self.window_len,self.batch_size,self.embed_sz)
 										
 										for num in range(0,self.batch_size):
 											count=0
-											for frame in sorted_frame_names[(num+np.ceil(num_batches//self.batch_size)*mega_batch_num)*self.window_len:(num+1+np.ceil(num_batches//self.batch_size)*mega_batch_num)*self.window_len]:
-												batched_tensor[count,num,:] = torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
+											idx1 = int((num+np.ceil(num_mega_batches)*mega_batch_num)*self.window_len)
+											idx2 = int((1+num+np.ceil(num_mega_batches)*mega_batch_num)*self.window_len)
+											for frame in sorted_frame_names[idx1:idx2]:
+												batched_tensor[count,num,:] = torch.from_numpy(torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame))
 												count+=1
 
 										if(vid+str((num+1)*self.window_len)):
-											data_dic[vid+str((num+1)*self.window_len)] = (batched_tensor,self.label_to_ix(cl),cl,self.data_dir+'/'+phase+'/'+cl+vid+'/')
+											data_dic[vid+str((num+1)*self.window_len+mega_batch_num*self.window_len)] = (batched_tensor,self.label_to_ix(cl),cl,self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/')
 
 									### taking the last 5 frames and then zero padding rest of the batch
 									if(vid+str(num_frames-self.window_len)):
 										batched_tensor = torch.zeros(self.window_len,self.batch_size,self.embed_sz)
 										count = 0
 										for frame in sorted_frame_names[len(sorted_frame_names)-self.window_len:]:
-											batched_tensor[count,0,:] = torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
+											batched_tensor[count,0,:] = torch.from_numpy(torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame))
 											count+=1
 
 										if(vid+str((num+1)*self.window_len)):
-											data_dic[vid+str((num+1)*self.window_len)] = (batched_tensor,self.label_to_ix(cl),cl,self.data_dir+'/'+phase+'/'+cl+vid+'/')
+											data_dic[vid+str(len(sorted_frame_names))] = (batched_tensor,self.label_to_ix(cl),cl,self.data_dir+'/'+phase+'/'+cl+vid+'/')
 
 								### Computed based on min frames in train_set. I chose value = highest prime factor, but can be increased.
 
@@ -206,14 +214,15 @@ class lstm_proc(nn.Module):
 
 from torch.optim import lr_scheduler
 
-
+def find_2(s):
+	return [i for i,j in enumerate(s) if j=='_'][1]
 
 
 def train_net(model_cl,multi=0):
 
 	all_data_dic = {'train':model_cl.load_data('train'),'val':model_cl.load_data('val')}
 	
-	
+	os.environ['CUDA_VISIBLE_DEVICES']=str(model_cl.gpu_num)
 	
 	train_data_keys = list(all_data_dic['train'].keys())
 	val_data_keys = list(all_data_dic['val'].keys())
@@ -230,7 +239,7 @@ def train_net(model_cl,multi=0):
 	else:
 		model_cl = model_cl.cuda()
 
-	op = optim.SGD(model_cl.parameters(),lr=0.005)
+	op = optim.SGD(model_cl.parameters(),lr=model_cl.lr)
 	all_loss_train = []
 	all_loss_val = []
 	num_to_lab = {}
@@ -238,8 +247,11 @@ def train_net(model_cl,multi=0):
 	epoch_list=[]
 	best_val_acc = 0
 
-	exp_lr_scheduler = lr_scheduler.MultiStepLR(optimizer=op,milestones=[25],gamma=0.1/3)
+	exp_lr_scheduler = lr_scheduler.MultiStepLR(optimizer=op,milestones=model_cl.step_lr,gamma=0.1)
 
+	if(model_cl.batch_size>1):
+		agg_pred_dic = {}  # This dictionary is for aggregating per batch results 
+		
 	for epoch in range(0,model_cl.epochs):
 	#for epoch in range(0,1):
 	
@@ -249,11 +261,12 @@ def train_net(model_cl,multi=0):
 		#epoch_list.append(epoch)
 		conf_m_vid = np.zeros((model_cl.num_views,model_cl.num_views))
 		conf_m_img = np.zeros_like(conf_m_vid)
-		print('model = ', 'layers_'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout))
+		print('model = ', 'layers_'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
 		print('epoch = ',epoch)
 
+		
 		for phase in ['train','val']:
-		#for phase in ['train','val']:
+		#for phase in ['val']:
 			#print(phase)
 			if(phase=='train'):
 				exp_lr_scheduler.step()
@@ -273,27 +286,14 @@ def train_net(model_cl,multi=0):
 				embeds,label,label_name,name_file = all_data_dic[phase][keys]
 				if(label not in num_to_lab):
 					num_to_lab[label.numpy()[0]] = label_name 
-				#print(keys)
-				#print(embeds)
-				#print(label_name)
-				#print(label)
-				#print(name_file)
-				#print(phase)
-				#print(label)
-				#print(label.size())
-				#print(keys)
-				if(model_cl.batch_size==1):
-					label = torch.LongTensor(embeds.size(0)).fill_(label[0])
-				else:
-					label_tensor = torch.zeros(embeds.size(0),embeds.size(1))
-					label_tensor = label.fill_(label[0])
-					label = label_tensor
-								
+				
+				label = torch.LongTensor(embeds.size(0)).fill_(label[0])
+				
 				embeds = Variable(embeds.cuda())
 				label = Variable(label.cuda())
-				#print(embeds)
+				
 				out = model_cl(embeds)
-				#print(out)
+				
 				loss = criterion(out.view(out.size(0),-1),label)
 
 				if(phase =='train'):
@@ -305,18 +305,35 @@ def train_net(model_cl,multi=0):
 
 					pred_img,pred_img_idx = out.max(dim=1)
 					#print(pred_img_idx)
-					#exit()
-					pred_vid = stats.mode(pred_img_idx.cpu().data.numpy())[0]
+					
 					for pred_img_val in pred_img_idx.cpu().data.numpy().astype(int):
 						#print(pred_img_val)
 						conf_m_img[label.cpu().data[0],pred_img_val]+=1
-					conf_m_vid[label.cpu().data[0],pred_vid]+=1
-					#optimizer.step()
 					
+
+					if(model_cl.batch_size==1):
+						pred_vid = stats.mode(pred_img_idx.cpu().data.numpy())[0] # This would be the per batch prediction of that video 
+						
+						conf_m_vid[label.cpu().data[0],pred_vid]+=1
+					else:
+						id_pos = find_2(keys)
+						if(keys[:id_pos] not in agg_pred_dic):
+							agg_pred_dic[keys[:id_pos]] = [[],label.cpu().data[0]]
+
+						agg_pred_dic[keys[:id_pos]][0]+= list(pred_img_idx.cpu().data)  
+
+
 				del(out)
 				del(loss)
 				del(label)
 				del(embeds)
+
+			if(model_cl.batch_size>1):
+				for item_id in agg_pred_dic:
+					vid_pred = stats.mode(agg_pred_dic[item_id][0])[0][0]
+					actual_lab = agg_pred_dic[item_id][1]
+					conf_m_vid[actual_lab,vid_pred]+=1
+
 			if(epoch not in epoch_list):
 				epoch_list.append(epoch)
 			
@@ -324,16 +341,17 @@ def train_net(model_cl,multi=0):
 			if(phase=='train'):
 				all_loss_train.append(running_loss_train)
 				plt.plot(epoch_list,all_loss_train)
-				plt.savefig('/data/gabriel/train_loss_rnn/train_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'_loss.png')
+				if(model_cl.batch_size==1):
+					plt.savefig('/data/gabriel/train_loss_rnn/train_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
+				else:
+					plt.savefig('/data/gabriel/train_loss_rnn/batch/train_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
+				
 				plt.close()
-				#print(epoch_list)
-				#print(all_loss_train)
-				#pickle.dump(all_loss_train,open('/data/gabriel/train_val_loss_rnn/train_val_loss_rnn/new_train_hidden_dim_'+str(model_cl.layers)+'_loss.pkl','wb'))
+				
 				#pickle.dump(all_loss_val,open('/data/gabriel/train_val_loss_rnn/train_val_loss_rnn/new_val_hidden_dim_'+str(model_cl.layers)+'_loss.pkl','wb'))
 			else:
 				all_loss_val.append(running_loss_val)		
-				#print(epoch_list)
-				#print(all_loss_train)
+				
 				vid_acc = conf_m_vid.diagonal().sum()/conf_m_vid.sum()
 				img_acc = conf_m_img.diagonal().sum()/conf_m_img.sum()
 				print('video accuracy =',vid_acc)
@@ -342,30 +360,20 @@ def train_net(model_cl,multi=0):
 				if(img_acc >= best_val_acc):
 					best_val_acc = img_acc
 					best_model = model_cl
-					print('best_epoch = ',epoch)
+				
 				plt.plot(epoch_list,all_loss_val)
-
-
-				plt.savefig('/data/gabriel/train_loss_rnn/val_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'_loss.png')
+				if(model_cl.batch_size==1):
+					plt.savefig('/data/gabriel/train_loss_rnn/val_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
+				else:
+					plt.savefig('/data/gabriel/train_loss_rnn/batch/val_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
+				
 				plt.close()
 
 
 		random.shuffle(train_data_keys)
 		random.shuffle(val_data_keys)
 		data_keys = {'train':train_data_keys,'val':val_data_keys}
-	#print(len(all_loss_train))
-	#print(all_loss_train)
-	#print(len(np.arange(0,model_cl.epochs)))
-	#plt.plot(all_loss_train,np.arange(0,model_cl.epochs))
-	#plt.savefig('/data/gabriel/train_loss_rnn/new_train_hidden_dim_'+str(model_cl.layers)+'_loss.png')
-	#plt.close()
-	#pickle.dump(all_loss_train,open('/data/gabriel/train_val_loss_rnn/train_val_loss_rnn/new_train_hidden_dim_'+str(model_cl.layers)+'_loss.pkl','wb'))
-	#pickle.dump(all_loss_val,open('/data/gabriel/train_val_loss_rnn/train_val_loss_rnn/new_val_hidden_dim_'+str(model_cl.layers)+'_loss.pkl','wb'))
 	
-	#plt.plot(all_loss_val,np.arange(0,model_cl.epochs))
-	#plt.savefig('/data/gabriel/train_loss_rnn/train_val_loss_rnn/val_hidden_dim_'+str(model_cl.layers)+'_loss.png')
-	#plt.close()
-	#print(model_cl.load_state_dict(best_model_wts))
 	return model_cl,op,num_to_lab
 import os
 
@@ -376,7 +384,7 @@ def test(model_cl,res_dir):
 
 	if(not os.path.exists(res_dir)):
 		os.makedirs(res_dir)
-
+	os.environ['CUDA_VISIBLE_DEVICES']=str(model_cl.gpu_num)
 	test_dic = {'test':model_cl.load_data('test')}
 	test_data_keys = list(test_dic['test'].keys())
 	model_cl.eval()
@@ -392,7 +400,7 @@ def test(model_cl,res_dir):
 	conf_m_img = np.zeros_like(conf_m_vid)
 
 	misc_cl = {}
-
+	agg_pred_dic = {}
 	for keys in test_data_keys:
 		#print(keys)
 		embeds,label,label_name,name_file = test_dic['test'][keys]
@@ -418,24 +426,45 @@ def test(model_cl,res_dir):
 			#print(pred_lab[i][0])
 			conf_m_img[label.numpy().astype(int)[i],pred_lab[i]]+=1
 
-		pred_vid = stats.mode(pred_lab.numpy(),axis=None)
 		#print(pred_vid)
 		#print(pred_lab)
 		#print(ac_label)
 		#print(pred_vid[0])
-		conf_m_vid[ac_label,pred_vid[0]]+=1
+		if(model_cl.batch_size==1):
+			pred_vid = stats.mode(pred_lab.numpy(),axis=None)
+			
+			conf_m_vid[ac_label,pred_vid]+=1
+			if(pred_vid[0]!=ac_label):
+				# print(pred_vid[0])
+				# print(ac_label)
+				misc_cl[keys] = [model_cl.labels[pred_vid[0][0]],model_cl.labels[int(ac_label)]]
 
-		if(pred_vid[0]!=ac_label):
-			# print(pred_vid[0])
-			# print(ac_label)
-			misc_cl[keys] = [model_cl.labels[pred_vid[0][0]],model_cl.labels[int(ac_label)]]
+		else:
+			id_pos = find_2(keys)
+			if(keys[:id_pos] not in agg_pred_dic):
+				agg_pred_dic[keys[:id_pos]] = [[],label]
 
+			agg_pred_dic[keys[:id_pos]][0]+= list(pred_lab)  
+
+			
 			### format is --- 'video_numframes -- > predicted label , actual label'
 
 		#exit()
 		#is_eq =	torch.eq(pred_lab,out_cpu.data).numpy()
 
 		#img_acc+=torch.sum(torch.eq(label,out_cpu.data))
+
+	if(model_cl.batch_size>1):
+
+		for item_id in agg_pred_dic:
+			vid_pred = stats.mode(agg_pred_dic[item_id][0])[0][0]
+			actual_lab = agg_pred_dic[item_id][1]
+			conf_m_vid[ac_label,vid_pred]+=1
+			if(vid_pred!=ac_label):
+				# print(pred_vid[0])
+				# print(ac_label)
+				misc_cl[item_id] = [model_cl.labels[vid_pred],model_cl.labels[int(ac_label)]]
+
 	m_name = res_dir[res_dir.find('s_lstm'):res_dir.find('.pth')]
 	#print(res_dir)
 	print(m_name)
