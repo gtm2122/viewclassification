@@ -222,7 +222,7 @@ def train_net(model_cl,multi=0):
 
 	all_data_dic = {'train':model_cl.load_data('train'),'val':model_cl.load_data('val')}
 	
-	os.environ['CUDA_VISIBLE_DEVICES']=str(model_cl.gpu_num)
+	#os.environ['CUDA_VISIBLE_DEVICES']=str(model_cl.gpu_num)
 	
 	train_data_keys = list(all_data_dic['train'].keys())
 	val_data_keys = list(all_data_dic['val'].keys())
@@ -251,7 +251,7 @@ def train_net(model_cl,multi=0):
 
 	if(model_cl.batch_size>1):
 		agg_pred_dic = {}  # This dictionary is for aggregating per batch results 
-		
+
 	for epoch in range(0,model_cl.epochs):
 	#for epoch in range(0,1):
 	
@@ -384,7 +384,7 @@ def test(model_cl,res_dir):
 
 	if(not os.path.exists(res_dir)):
 		os.makedirs(res_dir)
-	os.environ['CUDA_VISIBLE_DEVICES']=str(model_cl.gpu_num)
+	#os.environ['CUDA_VISIBLE_DEVICES']=str(model_cl.gpu_num)
 	test_dic = {'test':model_cl.load_data('test')}
 	test_data_keys = list(test_dic['test'].keys())
 	model_cl.eval()
@@ -408,7 +408,7 @@ def test(model_cl,res_dir):
 		embeds = Variable(embeds.cuda())
 		
 		ac_label = label[0]
-
+				
 		label = torch.FloatTensor(embeds.size(0)).fill_(label[0])
 		#label = Variable(label.cuda())
 		#print(label)
@@ -433,7 +433,7 @@ def test(model_cl,res_dir):
 		if(model_cl.batch_size==1):
 			pred_vid = stats.mode(pred_lab.numpy(),axis=None)
 			
-			conf_m_vid[ac_label,pred_vid]+=1
+			conf_m_vid[ac_label,pred_vid[0][0]]+=1
 			if(pred_vid[0]!=ac_label):
 				# print(pred_vid[0])
 				# print(ac_label)
@@ -442,9 +442,14 @@ def test(model_cl,res_dir):
 		else:
 			id_pos = find_2(keys)
 			if(keys[:id_pos] not in agg_pred_dic):
-				agg_pred_dic[keys[:id_pos]] = [[],label]
+				agg_pred_dic[keys[:id_pos]] = [[],[]]
 
+			# print('pred')
+			# print(pred_lab)
+			# print('lab')
+			# print(label)
 			agg_pred_dic[keys[:id_pos]][0]+= list(pred_lab)  
+			agg_pred_dic[keys[:id_pos]][1]+= list(label)  
 
 			
 			### format is --- 'video_numframes -- > predicted label , actual label'
@@ -453,21 +458,23 @@ def test(model_cl,res_dir):
 		#is_eq =	torch.eq(pred_lab,out_cpu.data).numpy()
 
 		#img_acc+=torch.sum(torch.eq(label,out_cpu.data))
-
+	#print(agg_pred_dic)
 	if(model_cl.batch_size>1):
 
 		for item_id in agg_pred_dic:
 			vid_pred = stats.mode(agg_pred_dic[item_id][0])[0][0]
-			actual_lab = agg_pred_dic[item_id][1]
-			conf_m_vid[ac_label,vid_pred]+=1
-			if(vid_pred!=ac_label):
+			actual_lab = agg_pred_dic[item_id][1][0]
+			
+			#print(actual_lab)
+			conf_m_vid[int(actual_lab),int(vid_pred)]+=1
+			if(vid_pred!=actual_lab):
 				# print(pred_vid[0])
 				# print(ac_label)
-				misc_cl[item_id] = [model_cl.labels[vid_pred],model_cl.labels[int(ac_label)]]
+				misc_cl[item_id] = [model_cl.labels[vid_pred],model_cl.labels[int(actual_lab)]]
 
 	m_name = res_dir[res_dir.find('s_lstm'):res_dir.find('.pth')]
 	#print(res_dir)
-	print(m_name)
+	#print(m_name)
 	pickle.dump(conf_m_vid,open(res_dir+'/'+m_name+'_video_conf_m.pkl','wb'))
 	pickle.dump(conf_m_img,open(res_dir+'/'+m_name+'_image_conf_m.pkl','wb'))
 	pickle.dump(misc_cl,open(res_dir+'/'+m_name+'_misc_videos.pkl','wb'))
