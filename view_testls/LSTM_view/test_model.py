@@ -124,11 +124,7 @@ def predict(main_dir,fe_model_obj,lstm_obj,output_legend,model_name='densenet',n
 				#torch.cuda.set_device(0)
 			
 			for img,name in loader['test']:
-				#print(img.size())
-				#img2 = img.numpy().squeeze().transpose(1,2,0)
-				#scipy.misc.imsave('./abc.png',img2)
-				#print(img2.shape)
-				#plt.imshow(img2),plt.show()
+			
 				
 				img = Variable(img).cuda()
 
@@ -145,29 +141,16 @@ def predict(main_dir,fe_model_obj,lstm_obj,output_legend,model_name='densenet',n
 				#pred[count] = lstm_model(out)
 				count+=1
 				torch.cuda.empty_cache()		
-			#print(count)
-			#print(lstm_model(Variable(bneck_current.cuda())))
-			#os.environ['CUDA_VISIBLE_DEVICES']='3'
-			#torch.cuda.set_device(3)
+			
 			
 			gc.collect()
 
-		#with torch.cuda.device(1):
+		
 			gc.collect()
-			#print(flag)
-			#print("PRE LSTM")
-			#torch.cuda.set_device(2)
+			
 			if(flag==1):
 				model_list_preds = []
 				c = 0
-				
-				
-				# for items in lstm_obj:
-				# 	items = items.cuda()
-
-				#print(lstm_obj)
-				#lstm_obj_c = lstm_obj.copy()
-				c=0
 				#print("LSTM")
 				bneck_current_gpu = Variable(bneck_current[:min([70,bneck_current.size(0)]),:,:].cuda())
 				#print("LSTM")
@@ -229,10 +212,6 @@ if __name__=="__main__":
 	#model_names = '/data/gabriel/saved_lstm//lstm_hd1500_layers_2_dr_0'#] ## Top 3
 
 	model_obj_list = [torch.load(i+'.pth').eval().cuda() for i in model_names]
-	#model_obj_list = torch.load(model_names+'.pth') 
-	#
-	# for i in model_obj_list:
-	# 	test(i[1],'./bla.pkl')
 
 	fe = get_extractor('/data/gabriel/VC_1/SET7/DenseNetModel_pretrained_7_views_bs_64_e_50_26092017_182851.pth.tar').eval().cuda()
 	
