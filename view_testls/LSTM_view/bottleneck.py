@@ -22,7 +22,7 @@ import os
 import scipy
 import cv2
 from PIL import Image
-#import Augmentor
+import Augmentor
 import pickle
 import shutil
 
@@ -30,15 +30,26 @@ import shutil
 
 
 class gen_b(object):
-	def __init__(self,model1,data_dir,save_dir,b_size=1,gpu_num=0):
+	def __init__(self,model1,data_dir,save_dir,b_size=1,gpu_num=0,use_aug = False):
 		self.b_size= b_size
 		self.save_dir = save_dir
 		self.gpu_num = gpu_num
 		self.data_dir = data_dir
-		self.data_transform = transforms.Compose([transforms.Resize((300,300)),
-				transforms.CenterCrop(300),
-				transforms.ToTensor(),
-				transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
+
+		if(use_aug):
+			self.p = Augmentor.Pipeline()
+			self.p.gaussian_distortion(probability=1,grid_width = 8,grid_height=8,magnitude = 9,corner='bell',method='in')
+			self.data_transform = transforms.Compose([transforms.Scale(300),
+					transforms.CenterCrop(300),
+					transforms.ToTensor(),
+					p.torch._transorm(),
+					transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
+		else:
+			self.data_transform = transforms.Compose([transforms.Scale(300),
+					transforms.CenterCrop(300),
+					transforms.ToTensor(),
+					transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
+
 		self.classes = [i for i in os.listdir(self.data_dir+'/test/') if '.' not in i]
 		self.model1=model1.eval()
 	def get_data(self,fol,cl_name):
@@ -84,7 +95,7 @@ class gen_b(object):
 			#torch.save(dset,open(self.save_dir+'/'+fol+'/'+cl_name+'/dataset_'+cl_name+'_'+fol+'.pth','wb'))
 			torch.save(dset_loader,open(self.save_dir+'/'+fol+'/'+cl_name+'/dataset_loader_'+cl_name+'_'+fol+'.pth','wb'))
 			pickle.dump(name_num_table,open(self.save_dir+'/'+fol+'/name_data_'+fol+'.pkl','wb'))
-		
+			
 			#dset = {fol:torch.utils.data.TensorDataset(img_data,name_data)}
 			#dset_loader ={fol:torch.utils.data.DataLoader(dset[fol],batch_size=self.b_size,shuffle=False,num_workers=4)}
 			#torch.save(dset,open(self.save_dir+'/'+fol+'/dataset_'+fol+'.pth','wb'))
