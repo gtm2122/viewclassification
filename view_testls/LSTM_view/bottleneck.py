@@ -1,6 +1,6 @@
-### generate bottlenecks
+## generate bottlenecks
 import matplotlib.pyplot as plt
-import  torch.utils.data as data_utils
+#import  torch.utils.data as data_utils
 import torch.nn as nn
 #from torchvision.models import inception
 #from torchvision.models import Inception3
@@ -26,7 +26,7 @@ from PIL import Image
 import pickle
 import shutil
 
-d_net = models.densenet161(pretrained=True)
+#d_net = models.densenet161(pretrained=True)
 
 
 class gen_b(object):
@@ -35,7 +35,7 @@ class gen_b(object):
 		self.save_dir = save_dir
 		self.gpu_num = gpu_num
 		self.data_dir = data_dir
-		self.data_transform = transforms.Compose([transforms.Scale(300),
+		self.data_transform = transforms.Compose([transforms.Resize((300,300)),
 				transforms.CenterCrop(300),
 				transforms.ToTensor(),
 				transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
@@ -79,7 +79,7 @@ class gen_b(object):
 				count+=1
 			
 			dset = {fol:torch.utils.data.TensorDataset(img_data,name_data)}
-			print(self.b_size)
+			#print(self.b_size)
 			dset_loader ={fol:torch.utils.data.DataLoader(dset[fol],batch_size=int(self.b_size),shuffle=True)}
 			#torch.save(dset,open(self.save_dir+'/'+fol+'/'+cl_name+'/dataset_'+cl_name+'_'+fol+'.pth','wb'))
 			torch.save(dset_loader,open(self.save_dir+'/'+fol+'/'+cl_name+'/dataset_loader_'+cl_name+'_'+fol+'.pth','wb'))
@@ -118,10 +118,13 @@ class gen_b(object):
 					img = Variable(img_batch)
 					out = new_model(img.cuda())
 					feat = out
+					#print(feat.size())
 					#print(out.size())
 					out = F.relu(feat,inplace=True)
-					out = F.avg_pool2d(out,kernel_size=7,stride=1).view(feat.size(0),-1)
+					#print(out.size())
+					out = F.avg_pool2d(out,kernel_size=9,stride=1).view(feat.size(0),-1)
 					#out = out.view(self.b_size,-1)
+					#print(out.size())
 					out_save = out.cpu().data.numpy()
 					name_batch1 = name_batch.numpy()
 					for i in range(0,name_batch1.shape[0]):
@@ -138,17 +141,21 @@ class gen_b(object):
 #ab = gen_b(model = models.densenet161(pretrained=True),data_dir='/data/gabriel/VC_1/SET7/dataset/',save_dir='/data/gabriel/bottleneck_codes/',b_size= 12)
 #ab.get_f()
 
-#import sys
-#sys.path.append('../')
-#from nndev import model_pip
-#res = models.densenet161(pretrained=True)
-#res.classifier = nn.Linear(res.classifier.in_features,15)
-
-
-#obj1 = model_pip(model_in=res,data_path = '/storage/VC_2/SET1/dataset/',batch_size=1, gpu=0,scale = True,use_gpu=True,resume=False,verbose=False)
-#obj1.load_model('/storage/VC_2/SET1/DenseNetModel_pretrained_15_views_bs_64_e_50_21112017_193527.pth.tar')
-			
-#ab2 = gen_b(model = obj1.model ,data_dir='/storage/VC_2/SET1/dataset/',save_dir='/storage/SET1_bnecks/',b_size= 8)
-#ab2.get_f()
+if __name__=="__main__":
+	import sys
+	sys.path.append('../')
+	from nndev import model_pip
+	res = models.densenet161(pretrained=False)
+	res.classifier = nn.Linear(res.classifier.in_features,7)
+	
+#	for i,_ in res.state_dict().items():
+#		print(i)	
+	
+	obj1 = model_pip(model_in=res,data_path = '/data/gabriel//dataset/',batch_size=1, gpu=0,scale = True,use_gpu=True,resume=False,verbose=False)
+	#mm = torch.load('/home/gam2018/saved_models/VC_densenet/7_views/DenseNetModel_pretrained_7_views_bs_64_e_50_26092017_182851.pth.tar')
+	obj1.load_model('/home/gam2018/saved_models/VC_densenet/7_views/DenseNetModel_pretrained_7_views_bs_64_e_50_26092017_182851.pth.tar')
+	#print(obj1.model)				
+	ab2 = gen_b(model1 = obj1.model ,data_dir='/data/gabriel/dataset/',save_dir='/data/gabriel/SET1_bnecks/',b_size= 8)
+	ab2.get_f()
 
 		
