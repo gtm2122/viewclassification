@@ -18,7 +18,7 @@ def get_base_names(data_dir):
 	return list(set(list_names))
 
 
-def aug(data_dir,src_dir,aug_type = 'skew'):
+def aug(data_dir,src_dir,aug_type = 'skew',mag=1):
 	### Augments images in a <phase> directory and stores them separately
 	### data_dir is the directory that starts with 'test' or 'val'
 
@@ -48,9 +48,9 @@ def aug(data_dir,src_dir,aug_type = 'skew'):
 			p = Augmentor.Pipeline(src_dir+'/'+class_name+'/'+fol_name)
 
 			if(aug_type=='skew'):
-				p.skew_left_right(probability=1,magnitude = 0.5)
+				p.skew_left_right(probability=1,magnitude = mag)
 			else:
-				p.gaussian_distortion(probability=1,grid_width = 8,grid_height=8,magnitude = 9,corner='bell',method='in')
+				p.gaussian_distortion(probability=1,grid_width = 8,grid_height=8,magnitude = mag,corner='bell',method='in')
 
 			p.sample(len(os.listdir(src_dir+'/'+class_name+'/'+fol_name)))
 
@@ -58,9 +58,9 @@ def aug(data_dir,src_dir,aug_type = 'skew'):
 			p = Augmentor.Pipeline(src_dir+'/'+class_name+'/'+fol_name)
 			
 			if(aug_type=='skew'):
-				p.skew_top_bottom(probability=1,magnitude = 0.5)
+				p.skew_top_bottom(probability=1,magnitude = mag)
 			else:
-				p.random_distortion(probability=1,grid_width = 7,grid_height=7,magnitude = 9)
+				p.random_distortion(probability=1,grid_width = 7,grid_height=7,magnitude = mag)
 		
 
 			p.sample(len(os.listdir(src_dir+'/'+class_name+'/'+fol_name))-1)
