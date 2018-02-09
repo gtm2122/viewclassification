@@ -30,12 +30,12 @@ import shutil
 
 
 class gen_b(object):
-	def __init__(self,model1,data_dir,save_dir,b_size=1,gpu_num=0,use_aug = False):
+	def __init__(self,model1,data_dir,save_dir,b_size=1,gpu_num=0,use_aug = False,phase=-1):
 		self.b_size= b_size
 		self.save_dir = save_dir
 		self.gpu_num = gpu_num
 		self.data_dir = data_dir
-
+		self.phase = phase
 		if(use_aug):
 			self.p = Augmentor.Pipeline()
 			self.p.gaussian_distortion(probability=1,grid_width = 8,grid_height=8,magnitude = 9,corner='bell',method='in')
@@ -116,7 +116,12 @@ class gen_b(object):
 		del self.model1
 		new_model.cuda()
 		#for phase in ['test']:
-		for phase in ['train','val','test']:
+		if(self.phase=='all'):
+			phase_list = ['train','val','test']
+		else:
+			phase_list = self.phase
+		for phase in phase_list:
+		#for phase in ['train','val','test']:
 			print(phase)
 			for class_id in self.classes:
 				dataset_loader = self.get_data(phase,class_id)
@@ -166,7 +171,7 @@ if __name__=="__main__":
 	#mm = torch.load('/home/gam2018/saved_models/VC_densenet/7_views/DenseNetModel_pretrained_7_views_bs_64_e_50_26092017_182851.pth.tar')
 	obj1.load_model('/home/gam2018/saved_models/VC_densenet/7_views/DenseNetModel_pretrained_7_views_bs_64_e_50_26092017_182851.pth.tar')
 	#print(obj1.model)				
-	ab2 = gen_b(model1 = obj1.model ,data_dir='/data/gabriel/dataset/',save_dir='/data/gabriel/SET1_bnecks/',b_size= 8)
+	ab2 = gen_b(model1 = obj1.model ,data_dir='/data/gabriel/dataset/',save_dir='/data/gabriel/SET1_bnecks_distort4/',b_size= 13,phase='test_distort_skew')
 	ab2.get_f()
 
 		
