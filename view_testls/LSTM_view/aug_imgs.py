@@ -60,4 +60,4 @@ def aug(data_dir,src_dir):
 			p.sample(len(os.listdir(src_dir+'/'+class_name+'/'+fol_name))-1)
 
 
-aug('/data/gabriel/VC_1/SET7/dataset/test/','/data/gabriel/VC_1/SET7/dataset/test_distort/')
+aug('/data/gabriel/dataset/test/','/data/gabriel/dataset/test_distort/')
