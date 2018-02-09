@@ -42,20 +42,18 @@ def aug(data_dir,src_dir,aug_type = 'skew',mag=1):
 		p.sample(len(os.listdir(src_dir+'/'+class_name+'/'))-1)
 
 		os.rename(src_dir+'/'+class_name+'/output',src_dir+'/'+class_name+'/output_a')
-		path1 = src_dir+'/'+class_name+'/output',src_dir+'/'+class_name+'/output_a/'
+		path1 = src_dir+'/'+class_name+'/output_a/'
 		
 		all_base_names = get_base_names(data_dir)
 		unique_dic = {x:1 for x in all_base_names}
-		shutil.rmtree(src_dir+'/'+class_name+'/output',src_dir+'/'+class_name+'/output_a/0')
+		shutil.rmtree(src_dir+'/'+class_name+'/output_a/0')
 
 		for i in os.listdir(path1):
+			print(path1)
+			print(i)
 			new_name = i[:find_2(i)]+'a_'+str(unique_dic[i[:find_2(i)+1]] +'.jpg')
 			unique_dic[i[:find_2(i)+1]] +=1
 			os.rename(path1+'/'+i,path1+'/'+new_name)
-
-
-
-
 
 		del(p)
 		p = Augmentor.Pipeline(src_dir+'/'+class_name+'/')
@@ -68,8 +66,8 @@ def aug(data_dir,src_dir,aug_type = 'skew',mag=1):
 
 		p.sample(len(os.listdir(src_dir+'/'+class_name+'/'))-1)
 		os.rename(src_dir+'/'+class_name+'/output',src_dir+'/'+class_name+'/output_b')
-		path1 = src_dir+'/'+class_name+'/output',src_dir+'/'+class_name+'/output_b/'
-		shutil.rmtree(src_dir+'/'+class_name+'/output',src_dir+'/'+class_name+'/output_b/0')
+		path1 = src_dir+'/'+class_name+'/output_b/'
+		shutil.rmtree(src_dir+'/'+class_name+'/output_b/0')
 		all_base_names = get_base_names(data_dir)
 		unique_dic = {x:1 for x in all_base_names}
 		

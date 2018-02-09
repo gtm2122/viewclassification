@@ -30,12 +30,12 @@ import shutil
 
 
 class gen_b(object):
-	def __init__(self,model1,data_dir,save_dir,b_size=1,gpu_num=0,use_aug = False,phase=-1):
+	def __init__(self,model1,data_dir,save_dir,b_size=1,gpu_num=0,use_aug = False):
 		self.b_size= b_size
 		self.save_dir = save_dir
 		self.gpu_num = gpu_num
 		self.data_dir = data_dir
-		self.phase = phase
+
 		if(use_aug):
 			self.p = Augmentor.Pipeline()
 			self.p.gaussian_distortion(probability=1,grid_width = 8,grid_height=8,magnitude = 9,corner='bell',method='in')
@@ -120,8 +120,9 @@ class gen_b(object):
 		#	phase_list = ['train','val','test']
 		#else:
 		#	phase_list = self.phase
-		for phase in ['test_distort_skew']:
+		#for phase in ['test_distort_skew']:
 		#for phase in ['train','val','test']:
+		for phase in ['train','val','test']:
 			print(phase)
 			for class_id in self.classes:
 				dataset_loader = self.get_data(phase,class_id)
