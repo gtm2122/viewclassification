@@ -116,11 +116,11 @@ class gen_b(object):
 		del self.model1
 		new_model.cuda()
 		#for phase in ['test']:
-		if(self.phase=='all'):
-			phase_list = ['train','val','test']
-		else:
-			phase_list = self.phase
-		for phase in phase_list:
+		#if(self.phase=='all'):
+		#	phase_list = ['train','val','test']
+		#else:
+		#	phase_list = self.phase
+		for phase in ['test_distort_skew']:
 		#for phase in ['train','val','test']:
 			print(phase)
 			for class_id in self.classes:
@@ -171,7 +171,7 @@ if __name__=="__main__":
 	#mm = torch.load('/home/gam2018/saved_models/VC_densenet/7_views/DenseNetModel_pretrained_7_views_bs_64_e_50_26092017_182851.pth.tar')
 	obj1.load_model('/home/gam2018/saved_models/VC_densenet/7_views/DenseNetModel_pretrained_7_views_bs_64_e_50_26092017_182851.pth.tar')
 	#print(obj1.model)				
-	ab2 = gen_b(model1 = obj1.model ,data_dir='/data/gabriel/dataset/',save_dir='/data/gabriel/SET1_bnecks_distort4/',b_size= 13,phase='test_distort_skew')
+	ab2 = gen_b(model1 = obj1.model ,data_dir='/data/gabriel/dataset/',save_dir='/data/gabriel/SET1_bnecks_distort4/',b_size= 13)
 	ab2.get_f()
 
 		
