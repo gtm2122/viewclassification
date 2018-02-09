@@ -67,7 +67,16 @@ def aug(data_dir,src_dir,aug_type = 'skew',mag=1):
 			
 			count=1
 			for new_img_path in os.listdir(src_dir+'/'+class_name+'/'+fol_name+'/output/'):
-				path_img = src_dir+'/'+class_name+'/'+fol_name+'/output/'+new_img_path
-				os.rename(path_img,src_dir+'/'+class_name+'/'+fol_name+'/output/'+'/'+str(count)+'.jpg')
-				count+=1
+				if(len(new_img_path)>4):
+					path_img = src_dir+'/'+class_name+'/'+fol_name+'/output/'+new_img_path
+					os.rename(path_img,src_dir+'/'+class_name+'/'+fol_name+'/output/'+fol_name+'_'+str(count)+'.jpg')
+					temp_p = src_dir+'/'+class_name+'/'+fol_name+'/output/'
+					for f_name in os.listdir(src_dir+'/'+class_name+'/'+fol_name+'/output/'):
+						
+						shutil.copy2(temp_p+fol_name+'_'+str(count)+'.jpg',src_dir+'/'+class_name+'/'+fol_name)
+
+					count+=1
+
+			shutil.rmtree(src_dir+'/'+class_name+'/'+fol_name+'/output/')
+
 aug('/data/gabriel/VC_1/SET7/dataset/test/','/data/gabriel/VC_1/SET7/dataset/test_distort2/')
