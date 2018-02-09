@@ -24,14 +24,14 @@ def aug(data_dir,src_dir,aug_type = 'skew',mag=1):
 
 	list_class_name = [i for i in os.listdir(data_dir) if os.path.isdir(data_dir+'/'+i)]
 
-	for class_name in list_class_name[:3]:
+	for class_name in list_class_name:
 		try:
 			shutil.rmtree(src_dir+'/'+class_name)
 			os.makedirs(src_dir+'/'+class_name)
 		except:
 			os.makedirs(src_dir+'/'+class_name)
 
-		for fol_name in get_base_names(data_dir+'/'+class_name)[:10]:
+		for fol_name in get_base_names(data_dir+'/'+class_name):
 			
 			try:
 				shutil.rmtree(src_dir+'/'+class_name+'/'+fol_name)
@@ -64,7 +64,7 @@ def aug(data_dir,src_dir,aug_type = 'skew',mag=1):
 		
 
 			p.sample(len(os.listdir(src_dir+'/'+class_name+'/'+fol_name))-1)
-			
+			del(p)
 			count=1
 			for new_img_path in os.listdir(src_dir+'/'+class_name+'/'+fol_name+'/output/'):
 				if(len(new_img_path)>4):
