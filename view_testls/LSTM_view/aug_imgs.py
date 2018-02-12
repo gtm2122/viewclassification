@@ -81,7 +81,7 @@ def aug(data_dir,src_dir,temp_dir,aug_types = 'skew_h'):
 	# if(not(os.path.isdir(src_dir))):
 	# 	os.makedirs(src_dir)
 
-	for class_name in list_class_name[:1]:
+	for class_name in list_class_name:
 		try:
 			shutil.rmtree(src_dir+'/'+class_name)
 			shutil.copytree(data_dir+'/'+class_name,src_dir+'/'+class_name)
@@ -91,7 +91,7 @@ def aug(data_dir,src_dir,temp_dir,aug_types = 'skew_h'):
 
 		class_name_dir = src_dir+'/'+class_name+'/'
 		### Folders are requires since augmentor names files based on the folder images are present in
-		for fol_name in get_base_names(data_dir+'/'+class_name)[:3]:
+		for fol_name in get_base_names(data_dir+'/'+class_name):
 			### Make folder per video containing all the frames of that video indexed as Pnum_vidnum
 			
 
