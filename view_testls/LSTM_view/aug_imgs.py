@@ -147,4 +147,4 @@ def aug(data_dir,src_dir,temp_dir,aug_types = 'skew_h'):
 
 	shutil.rmtree(temp_dir)
 
-aug('/data/gabriel/VC_1/SET7/dataset/test/','/data/gabriel/VC_1/SET7/dataset/test_distort3/','/data/gabriel/temp_dir/',['skew_h','gauss'],)
+#aug('/data/gabriel/VC_1/SET7/dataset/test/','/data/gabriel/VC_1/SET7/dataset/test_distort3/','/data/gabriel/temp_dir/',['skew_h','gauss'],)
