@@ -24,11 +24,6 @@ def rename_folder(aug_name,dest_dir,temp_dir,base_name):
 	#### AS WELL AS THE IMAGES THEMSELVES 
 	
 	#print(dest_dir)
-	if(not os.path.isdir(temp_dir)):
-		os.makedirs(temp_dir)
-
-	if(not os.path.isdir(temp_dir+'/'+base_name)):
-		os.makedirs(temp_dir+'/'+base_name)
 
 	
 	new_dest_fold = 'output_' + str(aug_name) 
@@ -46,11 +41,11 @@ def rename_folder(aug_name,dest_dir,temp_dir,base_name):
 			new_name = i[:find_2(i)-1]+aug_name+'_'+str(count) +'.jpg'
 			count+=1
 
-			print("new_name")
-			print(i[:find_2(i)])
-			print(new_name)
+			#print("new_name")
+			#print(i[:find_2(i)])
+			#print(new_name)
 			os.rename(new_dest_dir+'/'+i,new_dest_dir+'/'+new_name)
-
+	
 	return new_dest_dir
 
 def remove_folder(out_folder_dir,class_dir):
@@ -58,8 +53,7 @@ def remove_folder(out_folder_dir,class_dir):
 		if(os.path.isfile(out_folder_dir+'/'+i)):
 			shutil.copy2(out_folder_dir+'/'+i,class_dir)
 
-	
-
+	#shutil.rmtree(out_folder_dir)
 
 
 def aug(data_dir,src_dir,temp_dir,aug_types = 'skew_h'):
@@ -109,22 +103,22 @@ def aug(data_dir,src_dir,temp_dir,aug_types = 'skew_h'):
 					#print('here')
 
 			#fol_img = [i for i in os.listdir(data_dir+'/'+class_name) if fol_name in i]
-			print(len(os.listdir(class_name_dir+'/'+fol_name)))
+			#print(len(os.listdir(class_name_dir+'/'+fol_name)))
 			for aug_type in aug_types:
 				## Apply augmentations to all the images in that folder
 				p = Augmentor.Pipeline(class_name_dir+'/'+fol_name)
-				print(class_name_dir)
-				print(fol_name)
-				print(aug_type)
-				if(aug_type=='skew_h'):
-					p.skew_left_right(probability=1,magnitude = 0.5)
-				elif(aug_type=='skew_v'):
-					p.skew_left_right(probability=1,magnitude = 0.5)
+				#print(class_name_dir)
+				#print(fol_name)
+				#print(aug_type)
+				if(aug_type=='skewh'):
+					p.skew_left_right(probability=1,magnitude = 0.45)
+				elif(aug_type=='skewv'):
+					p.skew_left_right(probability=1,magnitude = 0.45)
 				elif(aug_type=='gauss'):
-					p.gaussian_distortion(probability=1,grid_width = 8,grid_height=8,magnitude = 9,corner='bell',method='in')
+					p.gaussian_distortion(probability=1,grid_width = 6,grid_height=6,magnitude = 9,corner='bell',method='in')
 				elif(aug_type=='rand'):
-					p.random_distortion(probability=1,grid_width = 7,grid_height=7,magnitude = 9)
-
+					p.random_distortion(probability=1,grid_width = 6,grid_height=6,magnitude = 9)
+				#print(src_dir+'/'+class_name+'/'+fol_name)
 				p.sample(len(os.listdir(src_dir+'/'+class_name+'/'+fol_name))) ### This thus stores all the augmented images in fol_name/output/
 				
 				#shutil.rmtree(class_name_dir+'/'+fol_name+'/output/0')
@@ -134,11 +128,13 @@ def aug(data_dir,src_dir,temp_dir,aug_types = 'skew_h'):
 				new_dest_dir_list.append(rename_folder(aug_name=aug_type,dest_dir=dest,temp_dir = temp_dir,base_name=fol_name))
 				
 				del(p)
-		
+		print(new_dest_dir_list)
 		for new_dest in new_dest_dir_list:
 			
 			remove_folder(new_dest,class_name_dir)
-
+			print('new_dest')
+			print(new_dest)
+			#shutil.rmtree(new_dest)
 		#Finally after moving everything, remove all folders in class_name_dir
 		for i in os.listdir(class_name_dir):
 			if(os.path.isdir(class_name_dir+'/'+i)):
@@ -146,5 +142,4 @@ def aug(data_dir,src_dir,temp_dir,aug_types = 'skew_h'):
 				shutil.rmtree(class_name_dir+'/'+i)
 
 	shutil.rmtree(temp_dir)
-
 #aug('/data/gabriel/VC_1/SET7/dataset/test/','/data/gabriel/VC_1/SET7/dataset/test_distort3/','/data/gabriel/temp_dir/',['skew_h','gauss'],)
