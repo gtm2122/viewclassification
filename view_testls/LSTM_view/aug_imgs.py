@@ -67,7 +67,6 @@ def aug(data_dir,src_dir,temp_dir,aug_types = 'skew_h'):
 		os.makedirs(temp_dir)
 
 	list_class_name = [i for i in os.listdir(data_dir) if os.path.isdir(data_dir+'/'+i)]
-	new_dest_dir_list = []
 	if(not(isinstance(aug_types,list))):
 		aug_types=list(aug_types)
 		### Forcing it to a list to iterate through string inputs instead of list of string inputs
@@ -88,7 +87,7 @@ def aug(data_dir,src_dir,temp_dir,aug_types = 'skew_h'):
 		for fol_name in get_base_names(data_dir+'/'+class_name):
 			### Make folder per video containing all the frames of that video indexed as Pnum_vidnum
 			
-
+			print(fol_name)
 
 			try:
 				shutil.rmtree(src_dir+'/'+class_name+'/'+fol_name)
@@ -104,6 +103,8 @@ def aug(data_dir,src_dir,temp_dir,aug_types = 'skew_h'):
 
 			#fol_img = [i for i in os.listdir(data_dir+'/'+class_name) if fol_name in i]
 			#print(len(os.listdir(class_name_dir+'/'+fol_name)))
+			new_dest_dir_list = []
+	
 			for aug_type in aug_types:
 				## Apply augmentations to all the images in that folder
 				p = Augmentor.Pipeline(class_name_dir+'/'+fol_name)
@@ -111,9 +112,9 @@ def aug(data_dir,src_dir,temp_dir,aug_types = 'skew_h'):
 				#print(fol_name)
 				#print(aug_type)
 				if(aug_type=='skewh'):
-					p.skew_left_right(probability=1,magnitude = 0.45)
+					p.skew_left_right(probability=1,magnitude = 0.5)
 				elif(aug_type=='skewv'):
-					p.skew_left_right(probability=1,magnitude = 0.45)
+					p.skew_left_right(probability=1,magnitude = 0.5)
 				elif(aug_type=='gauss'):
 					p.gaussian_distortion(probability=1,grid_width = 6,grid_height=6,magnitude = 9,corner='bell',method='in')
 				elif(aug_type=='rand'):
@@ -126,15 +127,15 @@ def aug(data_dir,src_dir,temp_dir,aug_types = 'skew_h'):
 				dest = src_dir+'/'+class_name+'/'+fol_name+'/output/'
 				
 				new_dest_dir_list.append(rename_folder(aug_name=aug_type,dest_dir=dest,temp_dir = temp_dir,base_name=fol_name))
-				
 				del(p)
-		print(new_dest_dir_list)
-		for new_dest in new_dest_dir_list:
-			
-			remove_folder(new_dest,class_name_dir)
-			print('new_dest')
-			print(new_dest)
-			#shutil.rmtree(new_dest)
+			print(new_dest_dir_list)
+				
+			for new_dest in new_dest_dir_list:
+				
+				remove_folder(new_dest,class_name_dir)
+
+			shutil.rmtree(temp_dir+'/'+fol_name)
+
 		#Finally after moving everything, remove all folders in class_name_dir
 		for i in os.listdir(class_name_dir):
 			if(os.path.isdir(class_name_dir+'/'+i)):
@@ -142,4 +143,5 @@ def aug(data_dir,src_dir,temp_dir,aug_types = 'skew_h'):
 				shutil.rmtree(class_name_dir+'/'+i)
 
 	shutil.rmtree(temp_dir)
-#aug('/data/gabriel/VC_1/SET7/dataset/test/','/data/gabriel/VC_1/SET7/dataset/test_distort3/','/data/gabriel/temp_dir/',['skew_h','gauss'],)
+
+#aug('/data/gabriel/VC_1/SET7/dataset/test2/','/data/gabriel/VC_1/SET7/dataset/test_distort23/','/data/gabriel/temp_dir/',['skewh','gauss'],)
