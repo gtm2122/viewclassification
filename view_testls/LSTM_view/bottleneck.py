@@ -50,7 +50,7 @@ class gen_b(object):
 					transforms.ToTensor(),
 					transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
 
-		self.classes = [i for i in os.listdir(self.data_dir+'/test/') if '.' not in i]
+		self.classes = [i for i in os.listdir(self.data_dir+'/test_distort_2_16/') if '.' not in i]
 		self.model1=model1.eval()
 	def get_data(self,fol,cl_name):
 		cl = [i for i in os.listdir(self.data_dir+'/'+fol) if '.' not in i]
@@ -120,9 +120,9 @@ class gen_b(object):
 		#	phase_list = ['train','val','test']
 		#else:
 		#	phase_list = self.phase
-		#for phase in ['test_distort_skew']:
+		for phase in ['test_distort_2_16','train_distort_2_16','val_distort_2_16']:
 		#for phase in ['train','val','test']:
-		for phase in ['train','val','test']:
+		#for phase in ['train','val','test']:
 			print(phase)
 			for class_id in self.classes:
 				dataset_loader = self.get_data(phase,class_id)
@@ -132,8 +132,8 @@ class gen_b(object):
 				for data in dataset_loader[phase]:
 					#print(data)
 					img_batch,name_batch = data
-					img = Variable(img_batch)
-					out = new_model(img.cuda())
+					img = Variable(img_batch.cuda(),volatile=True)
+					out = new_model(img)
 					feat = out
 					#print(feat.size())
 					#print(out.size())
@@ -172,7 +172,7 @@ if __name__=="__main__":
 	#mm = torch.load('/home/gam2018/saved_models/VC_densenet/7_views/DenseNetModel_pretrained_7_views_bs_64_e_50_26092017_182851.pth.tar')
 	obj1.load_model('/home/gam2018/saved_models/VC_densenet/7_views/DenseNetModel_pretrained_7_views_bs_64_e_50_26092017_182851.pth.tar')
 	#print(obj1.model)				
-	ab2 = gen_b(model1 = obj1.model ,data_dir='/data/gabriel/dataset/',save_dir='/data/gabriel/SET1_bnecks_distort4/',b_size= 13)
+	ab2 = gen_b(model1 = obj1.model ,data_dir='/data/gabriel//dataset/',save_dir='/data/gabriel/SET1_bnecks_2_16/',b_size= 100)
 	ab2.get_f()
 
 		
