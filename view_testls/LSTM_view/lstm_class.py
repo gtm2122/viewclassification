@@ -91,9 +91,10 @@ class lstm_proc(nn.Module):
 
 
 
-
+		# TODO change this for easier inference. Use another flag maybe ??
 		if(os.path.exists(self.cache_dir) and not(self.ow)):
-			return torch.load(self.cache_dir)
+			print('exists, loading cache')
+			return torch.load(self.cache_dir.replace('.pth','_')+phase+'.pth')
 		else:
 
 			### This is for batch_size = 1 :
@@ -205,7 +206,7 @@ class lstm_proc(nn.Module):
 
 
 
-			torch.save(data_dic,self.cache_dir)
+			torch.save(data_dic,self.cache_dir.replace('.pth','_')+phase+'.pth')
 			return data_dic
 			#img_tensor = torch.zeros(max_f,)
 			
@@ -220,17 +221,22 @@ def find_2(s):
 
 def train_net(model_cl,multi=0):
 
-	all_data_dic = {'train':model_cl.load_data('train'),'val':model_cl.load_data('val')}
-	
+	all_data_dic = {'train':model_cl.load_data('train'),'val':model_cl.load_data('val'),'train_distort_2_16':model_cl.load_data('train_distort_2_16'),'val_distort_2_16':model_cl.load_data('val_distort_2_16')}
+	#all_data_dic2 = {'train':all_data_dic[x] for x in all_data_dic.keys if 'train' in x,'val':all_data_dic[y] for y in all_data_dic.keys() if 'val'}
+    	
 	#os.environ['CUDA_VISIBLE_DEVICES']=str(model_cl.gpu_num)
-	
+	train_data_keys2 = list(all_data_dic['train_distort_2_16'].keys())
+	val_data_keys2 = list(all_data_dic['val_distort_2_16'].keys())
 	train_data_keys = list(all_data_dic['train'].keys())
 	val_data_keys = list(all_data_dic['val'].keys())
-
+	#print(train_data_keys)
+	#print(val_data_keys)
+    #exit()
 	random.shuffle(train_data_keys)
 	random.shuffle(val_data_keys)
-
-	data_keys = {'train':train_data_keys,'val':val_data_keys}
+	random.shuffle(train_data_keys2)
+	random.shuffle(val_data_keys2)
+	data_keys = {'train':train_data_keys,'val':val_data_keys,'train_distort_2_16':train_data_keys2,'val_distort_2_16':val_data_keys2}
 	criterion = nn.NLLLoss().cuda()
 	#print(data_keys['train'])
 	if(multi==1):
@@ -251,6 +257,7 @@ def train_net(model_cl,multi=0):
 
 	if(model_cl.batch_size>1):
 		agg_pred_dic = {}  # This dictionary is for aggregating per batch results 
+	count_train_val = 0
 
 	for epoch in range(0,model_cl.epochs):
 	#for epoch in range(0,1):
@@ -265,10 +272,12 @@ def train_net(model_cl,multi=0):
 		print('epoch = ',epoch)
 
 		
-		for phase in ['train','val']:
+		for phase in ['train','train_distort_2_16','val','val_distort_2_16']:
 		#for phase in ['val']:
-			#print(phase)
-			if(phase=='train'):
+			print(phase)
+			#if('2_16' in phase):
+			#	print(data_keys[phase])
+			if('train' in phase):
 				exp_lr_scheduler.step()
 				model_cl.train(True)
 			else:
@@ -282,25 +291,28 @@ def train_net(model_cl,multi=0):
 					model_cl.hidden = (model_cl.init_hidden()[0].cuda(async=False),model_cl.init_hidden()[1].cuda(async=False))
 				else:
 					model_cl.hidden = (model_cl.init_hidden()[0].cuda(),model_cl.init_hidden()[1].cuda())
-				
+				#print(all_data_dic[phase].keys())
 				embeds,label,label_name,name_file = all_data_dic[phase][keys]
 				if(label not in num_to_lab):
 					num_to_lab[label.numpy()[0]] = label_name 
 				
 				label = torch.LongTensor(embeds.size(0)).fill_(label[0])
 				
-				embeds = Variable(embeds.cuda())
-				label = Variable(label.cuda())
-				
+				if('val' in phase):
+					embeds = Variable(embeds.cuda(),volatile=True)
+					label = Variable(label.cuda(),volatile = True)
+				else:
+					embeds = Variable(embeds.cuda())
+					label = Variable(label.cuda())
 				out = model_cl(embeds)
 				
 				loss = criterion(out.view(out.size(0),-1),label)
 
-				if(phase =='train'):
+				if('train' in phase):
 					loss.backward()
 					running_loss_train+= loss.cpu().data.numpy()[0]
 					op.step()
-				if(phase=='val'):
+				if('val' in phase):
 					running_loss_val+= loss.cpu().data.numpy()[0]
 
 					pred_img,pred_img_idx = out.max(dim=1)
@@ -336,57 +348,72 @@ def train_net(model_cl,multi=0):
 
 			if(epoch not in epoch_list):
 				epoch_list.append(epoch)
-			
-			
-			if(phase=='train'):
-				all_loss_train.append(running_loss_train)
-				plt.plot(epoch_list,all_loss_train)
-				if(model_cl.batch_size==1):
-					plt.savefig('/data/gabriel/train_loss_rnn/train_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
+			if('train' in phase):
+				if(count_train_val==0):
+					#all_loss_train.append(running_loss_train)
+					count_train_val+=1
 				else:
-					plt.savefig('/data/gabriel/train_loss_rnn/batch/train_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
-				
-				plt.close()
-				
+					all_loss_train.append(running_loss_train)
+					count_train_val=0
+					plt.plot(epoch_list,all_loss_train)
+					if(model_cl.batch_size==1):
+						plt.savefig('/data/gabriel/train_loss_rnn/all_data_train_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
+					else:
+						plt.savefig('/data/gabriel/train_loss_rnn/batch/all_data_train_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
+					plt.close()
 				#pickle.dump(all_loss_val,open('/data/gabriel/train_val_loss_rnn/train_val_loss_rnn/new_val_hidden_dim_'+str(model_cl.layers)+'_loss.pkl','wb'))
 			else:
-				all_loss_val.append(running_loss_val)		
-				
-				vid_acc = conf_m_vid.diagonal().sum()/conf_m_vid.sum()
-				img_acc = conf_m_img.diagonal().sum()/conf_m_img.sum()
-				print('video accuracy =',vid_acc)
-				print('image accuracy =',img_acc)
-
-				if(img_acc >= best_val_acc):
-					best_val_acc = img_acc
-					best_model = model_cl
-				
-				plt.plot(epoch_list,all_loss_val)
-				if(model_cl.batch_size==1):
-					plt.savefig('/data/gabriel/train_loss_rnn/val_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
+				if(count_train_val==0):
+					#all_loss_val.append(running_loss_val)
+					count_train_val+=1
 				else:
-					plt.savefig('/data/gabriel/train_loss_rnn/batch/val_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
-				
-				plt.close()
+					all_loss_val.append(running_loss_val)
+					vid_acc = conf_m_vid.diagonal().sum()/conf_m_vid.sum()
+					img_acc = conf_m_img.diagonal().sum()/conf_m_img.sum()
+					print('video accuracy =',vid_acc)
+					print('image accuracy =',img_acc)
+					count_train_val=0
+					#print(epoch_list)
+					#print(all_loss_val)
+					if(img_acc >= best_val_acc):
+						best_val_acc = img_acc
+						best_model = model_cl
+
+					plt.plot(epoch_list,all_loss_val)
+					if(model_cl.batch_size==1):
+						plt.savefig('/data/gabriel/train_loss_rnn/all_data_val_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
+					else:
+						plt.savefig('/data/gabriel/train_loss_rnn/batch/all_data_val_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
+
+					plt.close()
 
 
 		random.shuffle(train_data_keys)
 		random.shuffle(val_data_keys)
-		data_keys = {'train':train_data_keys,'val':val_data_keys}
-	
+		random.shuffle(train_data_keys2)
+		random.shuffle(val_data_keys2)
+		data_keys = {'train':train_data_keys,'val':val_data_keys,'train_distort_2_16':train_data_keys2,'val_distort_2_16':val_data_keys2}
+
+
+	pickle.dump(all_loss_val,open('all_data_val_'+str(model_cl.layers)+'_'+str(model_cl.lr)+'_loss.pkl','wb'))
+
+
+	pickle.dump(all_loss_train,open('all_data_train_'+str(model_cl.layers)+'_'+str(model_cl.lr)+'_loss.pkl','wb'))
+
+
 	return model_cl,op,num_to_lab
 import os
 
 
 from scipy import stats
 import pickle
-def test(model_cl,res_dir):
+def test(model_cl,res_dir,test_class='test'):
 
 	if(not os.path.exists(res_dir)):
 		os.makedirs(res_dir)
 	#os.environ['CUDA_VISIBLE_DEVICES']=str(model_cl.gpu_num)
-	test_dic = {'test':model_cl.load_data('test')}
-	test_data_keys = list(test_dic['test'].keys())
+	test_dic = {str(test_class):model_cl.load_data(test_class)}
+	test_data_keys = list(test_dic[test_class].keys())
 	model_cl.eval()
 	model_cl = model_cl.cuda()
 	
@@ -403,7 +430,7 @@ def test(model_cl,res_dir):
 	agg_pred_dic = {}
 	for keys in test_data_keys:
 		#print(keys)
-		embeds,label,label_name,name_file = test_dic['test'][keys]
+		embeds,label,label_name,name_file = test_dic[test_class][keys]
 
 		embeds = Variable(embeds.cuda())
 		
@@ -475,9 +502,9 @@ def test(model_cl,res_dir):
 	m_name = res_dir[res_dir.find('s_lstm'):res_dir.find('.pth')]
 	#print(res_dir)
 	#print(m_name)
-	pickle.dump(conf_m_vid,open(res_dir+'/'+m_name+'_video_conf_m.pkl','wb'))
-	pickle.dump(conf_m_img,open(res_dir+'/'+m_name+'_image_conf_m.pkl','wb'))
-	pickle.dump(misc_cl,open(res_dir+'/'+m_name+'_misc_videos.pkl','wb'))
+	pickle.dump(conf_m_vid,open(res_dir+'/'+m_name+'_'+test_class+'_video_conf_m.pkl','wb'))
+	pickle.dump(conf_m_img,open(res_dir+'/'+m_name+'_'+test_class+'_image_conf_m.pkl','wb'))
+	pickle.dump(misc_cl,open(res_dir+'/'+m_name+'_'+test_class+'_misc_videos.pkl','wb'))
 
 	print(conf_m_vid)
 	
@@ -486,3 +513,4 @@ def test(model_cl,res_dir):
 
 	print('video accuracy = ',conf_m_vid.diagonal().sum()/conf_m_vid.sum())
 	print('image accuracy = ',conf_m_img.diagonal().sum()/conf_m_img.sum())
+	
