@@ -144,19 +144,17 @@ class gen_b(object):
 					#print(out.size())
 					out_save = out.cpu().data.numpy()
 					name_batch1 = name_batch.numpy()
-
-					min_values,_ = out_save.min(dim=1)
-					max_values,_ = out_save.max(dim=1)
 					
-					min_values = min_values.unsqueeze(1)
-					max_values = max_values.unsqueeze(1)
 					
-					out_saveN = -1 + (out_save-min_values)*(2/(max_values-min_values))
-
 					for i in range(0,name_batch1.shape[0]):
 						#print(name_batch[i])
 						#print(type(i))
-						torch.save(out_saveN[int(i),:],self.save_dir+'/'+phase+'/'+class_id+'/'+str(num_to_name[name_batch1[int(i)]])+'.pth')
+						out_saveN = out_save[int(i),:]
+						min_values = np.min(out_saveN)
+						max_values = np.max(out_saveN)
+						out_saveN = -1 + 2*(out_save-min_values)/(max_values-min_values)
+						
+						torch.save(out_saveN,self.save_dir+'/'+phase+'/'+class_id+'/'+str(num_to_name[name_batch1[int(i)]])+'.pth')
 						
 					#print(img_batch.size())
 					del(out)
