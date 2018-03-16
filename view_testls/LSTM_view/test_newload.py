@@ -9,13 +9,15 @@ import random
 
 lab_to_ix = {x:i for i,x in enumerate(os.listdir('/data/gabriel/SET1_bnecks_normed/test/'))}
 
-def load_data(data_dir,phase,dir_save_path = '/home/gam2018/cached_dsets/img_paths/100_pat_dset',step_size=1,ow=False):
+def load_data(data_dir,phase,dir_save_path = '/home/gam2018/cached_dsets/img_paths/100_pat_dset',step_size=1,ow=False,truncate=True):
     assert step_size>0 and isinstance(step_size,int),"step size must be a whole number"
     ###
     # data_dir = the dataset containing "test","train" etc. The contents of the folder are video folers containing
     # the CNN features extracted for each frame
     # phase = "test"/"train"/"val"
     # ow = overwrite list of paths ?
+    # Truncate = Should the batches be limited to having whole number multiple of batch size or not? If not then we must modify the
+    # loss function to not include the tail end zeros.
     class_list = os.listdir(data_dir+'/'+phase)
     seq_len = 10# number of images in a sequence
     batch_size = 100 # number of sequences in a batch
@@ -39,7 +41,6 @@ def load_data(data_dir,phase,dir_save_path = '/home/gam2018/cached_dsets/img_pat
                     seq_imgs_names = list_of_imgs[c:c+seq_len]
                     seq_imgs_names = [vid_path+'/'+i for i in seq_imgs_names]
                     img_path_list.append((seq_imgs_names,label,c))
-                    #print(type(img_path_list[-1][0]))
                     c+=1 ## using step size 1 to get all possible windows
                     ### The above list will contain all possible windows in a list
                     ### Storing 'c' to enable step size filtering - for eg if c%step_size==0 then include in batch.
@@ -47,29 +48,26 @@ def load_data(data_dir,phase,dir_save_path = '/home/gam2018/cached_dsets/img_pat
         print(img_path_list[-1])
 
         pickle.dump(img_path_list,open(dir_save_path+'/'+str(seq_len)+'_'+phase+'.pkl','wb'))
-        #print(img_path_list)
     else:
-
         img_path_list = pickle.load(open(dir_save_path+'/'+str(seq_len)+'_'+phase+'.pkl','rb'))
-
         if (step_size>1):
             new_path_list = [i for i in img_path_list if i[2]%step_size==0]
         else:
             new_path_list = img_path_list
         del img_path_list
-
+        total_num_seq = len(new_path_list)
         ### Now that we loaded all the img paths for each sequence, we arrange various sequences into a minibatch
-
-        batch_count = 0
+        if(truncate):
+            print(len(new_path_list))
+            total_num_batches = (total_num_seq // batch_size)
+            new_path_list = new_path_list[:total_num_batches*batch_size]
+            print(len(new_path_list))
 
         left_ind= 0
-        total_num_seq = len(new_path_list)
 
         right_ind = min(total_num_seq,left_ind + batch_size)
-        #print(len(new_path_list))
-        #exit()
+
         random.shuffle(new_path_list)
-        total_num_batches = np.ceil(total_num_seq/batch_size)
         while left_ind < len(new_path_list):
             ### Two ways to deal with the last k sequences, one, truncate to multiple of batch_size, two, zero pad.
             ### Trying zero pad.
@@ -87,32 +85,22 @@ def load_data(data_dir,phase,dir_save_path = '/home/gam2018/cached_dsets/img_pat
                 frame_num = 0
                 for img_paths in sequence_tuple[0]:
                     ### Now going through the paths of the images in a sequence to fill in the frames of a sequence
-                    #print(torch.from_numpy(torch.load(img_paths)).size())
-                    #print(img_minibatch.size())
-                    #print(img_minibatch[frame_num,mini_batch_idx,:].size())
+
                     img_minibatch[frame_num,mini_batch_idx,:] = torch.from_numpy(torch.load(img_paths))
                     frame_num+=1
                 lab_minibatch[mini_batch_idx] = lab_to_ix[sequence_tuple[1]]
 
                 mini_batch_idx+=1
 
-            #if(right_ind==len(new_path_list)):
-
-
             left_ind+=batch_size
             right_ind=min(left_ind+batch_size,len(new_path_list))
 
-
+            ### if Truncate set to false then we should use the indices until right_ind for the loss function
+            ### TODO Set option for truncate = False, return len(list)%batch_size to be used for loss function averaging.
             yield img_minibatch,lab_minibatch
 
 
-
-            #print(i)
-            #exit()
-
-            #img_minibatch[:,batch_count,:] =
-            batch_count=0
-for a,b in load_data('/data/gabriel/SET1_bnecks_normed/','test'):
+for a,b in load_data('/data/gabriel/SET1_bnecks_normed/','test',step_size=5,truncate=True):
     #print(a)
     #print(b)
     1==1
