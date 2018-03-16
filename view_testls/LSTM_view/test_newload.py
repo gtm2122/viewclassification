@@ -73,8 +73,8 @@ def load_data(data_dir,phase,dir_save_path = '/home/gam2018/cached_dsets/img_pat
         while right_ind < len(new_path_list):
             mini_batch_paths = new_path_list[left_ind:right_ind]
             ### loop to load the images into tensors
-            img_minibatch = torch.Tensor((seq_len, batch_size, embed_sz))
-            lab_minibatch = torch.Tensor((batch_size))
+            img_minibatch = torch.zeros((seq_len, batch_size, embed_sz))
+            lab_minibatch = torch.zeros((batch_size))
 
             mini_batch_idx = 0
             for sequence_tuple in mini_batch_paths:
@@ -83,6 +83,9 @@ def load_data(data_dir,phase,dir_save_path = '/home/gam2018/cached_dsets/img_pat
                 frame_num = 0
                 for img_paths in sequence_tuple[0]:
                     ### Now going through the paths of the images in a sequence to fill in the frames of a sequence
+                    print(torch.from_numpy(torch.load(img_paths)).size())
+                    print(img_minibatch.size())
+                    print(img_minibatch[frame_num,mini_batch_idx,:].size())
                     img_minibatch[frame_num,mini_batch_idx,:] = torch.from_numpy(torch.load(img_paths))
                     frame_num+=1
                 lab_minibatch[mini_batch_idx] = lab_to_ix[sequence_tuple[1]]
@@ -98,4 +101,5 @@ def load_data(data_dir,phase,dir_save_path = '/home/gam2018/cached_dsets/img_pat
 
             #img_minibatch[:,batch_count,:] =
             batch_count=0
-load_data('/data/gabriel/SET1_bnecks_normed/','test')
+a,b = load_data('/data/gabriel/SET1_bnecks_normed/','test')
+print(a,b)
