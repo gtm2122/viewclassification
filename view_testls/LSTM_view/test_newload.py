@@ -70,7 +70,11 @@ def load_data(data_dir,phase,dir_save_path = '/home/gam2018/cached_dsets/img_pat
         #exit()
         random.shuffle(new_path_list)
         total_num_batches = np.ceil(total_num_seq/batch_size)
-        while right_ind < len(new_path_list):
+        while left_ind < len(new_path_list):
+            ### Two ways to deal with the last k sequences, one, truncate to multiple of batch_size, two, zero pad.
+            ### Trying zero pad.
+            print(left_ind)
+            print(right_ind)
             mini_batch_paths = new_path_list[left_ind:right_ind]
             ### loop to load the images into tensors
             img_minibatch = torch.zeros((seq_len, batch_size, embed_sz))
@@ -79,27 +83,36 @@ def load_data(data_dir,phase,dir_save_path = '/home/gam2018/cached_dsets/img_pat
             mini_batch_idx = 0
             for sequence_tuple in mini_batch_paths:
                 ### Going through the 100 sequences
-                print(sequence_tuple)
+                #print(sequence_tuple[0][0])
                 frame_num = 0
                 for img_paths in sequence_tuple[0]:
                     ### Now going through the paths of the images in a sequence to fill in the frames of a sequence
-                    print(torch.from_numpy(torch.load(img_paths)).size())
-                    print(img_minibatch.size())
-                    print(img_minibatch[frame_num,mini_batch_idx,:].size())
+                    #print(torch.from_numpy(torch.load(img_paths)).size())
+                    #print(img_minibatch.size())
+                    #print(img_minibatch[frame_num,mini_batch_idx,:].size())
                     img_minibatch[frame_num,mini_batch_idx,:] = torch.from_numpy(torch.load(img_paths))
                     frame_num+=1
                 lab_minibatch[mini_batch_idx] = lab_to_ix[sequence_tuple[1]]
 
                 mini_batch_idx+=1
 
+            #if(right_ind==len(new_path_list)):
+
+
+            left_ind+=batch_size
+            right_ind=min(left_ind+batch_size,len(new_path_list))
+
+
             yield img_minibatch,lab_minibatch
 
 
-                #exit()
-            print(i)
+
+            #print(i)
             #exit()
 
             #img_minibatch[:,batch_count,:] =
             batch_count=0
-a,b = load_data('/data/gabriel/SET1_bnecks_normed/','test')
-print(a,b)
+for a,b in load_data('/data/gabriel/SET1_bnecks_normed/','test'):
+    #print(a)
+    #print(b)
+    1==1
