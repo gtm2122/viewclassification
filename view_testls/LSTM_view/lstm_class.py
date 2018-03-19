@@ -38,8 +38,10 @@ class lstm_proc(nn.Module):
 		self.layers = layers
 		self.dropout = dropout
 		self.lstm = nn.LSTM(input_size = self.embed_sz,hidden_size = self.hidden_dim,num_layers = self.layers, dropout = self.dropout)
-		self.cl = nn.Linear(self.hidden_dim*self.batch_size,self.num_views)
+		self.cl = nn.Linear(self.hidden_dim*self.window_len,self.num_views)
 		self.hidden = self.init_hidden()
+		self.lab_to_ix = {x:i for i,x in enumerate(self.labels)}
+		self.ix_to_lab = {self.lab_to_ix[i]:i for i in self.lab_to_ix.keys()}
 	# def init_hidden(self):
 	# 	return (Variable(torch.zeros(1,1,self.hidden_dim)),Variable(torch.zeros(1,1,self.hidden_dim)))
 
@@ -55,7 +57,17 @@ class lstm_proc(nn.Module):
 		#print(F.log_softmax(self.cl(out1).view(len(x),-1),dim=1))
 		#exit()
 		#print(self.cl(out1))
-		return F.log_softmax(self.cl(out1.view(len(x),-1)),dim=1)
+		# print(x)
+		# print(out1.size())
+		# print(x.size())
+		# print(out1.permute(1,0,2).size())
+		# print(len(x))
+		# print(self.hidden_dim)
+		# print(out1.permute(1,0,2).view(-1,self.hidden_dim*len(x)))
+		input_to_cl1 = out1.permute(1,0,2).cpu().data
+		#print(input_to_cl1.size())
+		input_to_cl1 = Variable(input_to_cl1.contiguous().cuda())
+		return F.log_softmax(self.cl(input_to_cl1.view(self.batch_size,self.hidden_dim*len(x))),dim=1)
 
 		
 
@@ -78,136 +90,99 @@ class lstm_proc(nn.Module):
 			return leng_max
 
 
-	
-	def label_to_ix(self,c):
-		#print(self.labels)
-		labs = {x:i for i,x in enumerate(self.labels) }
-		#print(labs)
+	def load_data(self, phase, step_size=1, ow=False, truncate=True,dir_save_path = '/home/gam2018/cached_dsets/img_paths/100_pat_dset',use_self_batch=True,batch_size=100):
 
-		return torch.LongTensor(1).fill_(labs[c])
+		assert step_size > 0 and isinstance(step_size, int), "step size must be a whole number"
+		###
+		# data_dir = the dataset containing "test","train" etc. The contents of the folder are video folers containing
+		# the CNN features extracted for each frame
+		# phase = "test"/"train"/"val"
+		# ow = overwrite list of paths ?
+		# Truncate = Should the batches be limited to having whole number multiple of batch size or not? If not then we must modify the
+		# loss function to not include the tail end zeros.
+		class_list = self.labels
+		seq_len = self.window_len  # number of images in a sequence
+		if(use_self_batch):
+			batch_size = self.batch_size  # number of sequences in a batch
 
-	def load_data(self,phase):
-		#max_f = find_max_frame(self.data_dir+'/'+phase)
+		embed_sz = self.embed_sz
+		if not (os.path.isfile(dir_save_path + '/' + str(seq_len) + '_' + phase + '.pkl')) or ow:
+			print("generating new list of image paths")
+			img_path_list = []
 
+			for label in class_list:
+				for vid_folder in os.listdir(self.data_dir + '/' + phase + '/' + label):
+					vid_path = self.data_dir + '/' + phase + '/' + label + '/' + vid_folder
+					num_frames = len(os.listdir(vid_path))
+					rem_imgs = num_frames % seq_len
+					c = 0
+					# list_of_imgs = os.listdir(vid_path)
+					list_of_imgs = sorted(os.listdir(vid_path),
+										  key=lambda s: [int(t) if t.isdigit() else t.lower() for t in
+														 re.split('(\d+)', s)])
+					# print(list_of_imgs)
+					# exit()
+					while c <= num_frames - seq_len:
+						seq_imgs_names = list_of_imgs[c:c + seq_len]
+						seq_imgs_names = [vid_path + '/' + i for i in seq_imgs_names]
+						img_path_list.append((seq_imgs_names, label, c))
+						c += 1  ## using step size 1 to get all possible windows
+					### The above list will contain all possible windows in a list
+					### Storing 'c' to enable step size filtering - for eg if c%step_size==0 then include in batch.
 
+			#print(img_path_list[-1])
 
-		# TODO change this for easier inference. Use another flag maybe ??
-		if(os.path.exists(self.cache_dir) and not(self.ow)):
-			print('exists, loading cache')
-			return torch.load(self.cache_dir.replace('.pth','_')+phase+'.pth')
+			pickle.dump(img_path_list, open(dir_save_path + '/' + str(seq_len) + '_' + phase + '.pkl', 'wb'))
 		else:
-
-			### This is for batch_size = 1 :
-			data_dic = {}
-			if self.batch_size == 1: ### This refers to num batches, not number in a batch:
-
-				 ### BECAUSE shape is (-1 , 1, 19872)
-				#print('here')
-				#print(max_f)
-				
-				for cl in os.listdir(self.data_dir+'/'+phase+'/'):
-					if '.p' not in phase and '.p' not in cl:
-						for vid in os.listdir(self.data_dir+'/'+phase+'/'+cl):
-							if '.p' not in vid:
-								
-								if(self.window_len <=0):
-
-									max_f  = len(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid))
-									#print(max_f)
-
-								img_tensor = torch.zeros(max_f,1,self.embed_sz)
-								count= 1
-								if(len(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid))>0):
-									sorted_frame_names = sorted(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'),key = lambda s:[int(t) if t.isdigit() else t.lower() for t in re.split('(\d+)',s)])
-									for frame in sorted_frame_names:
-										#print(sorted_frame_names)
-										img = torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame)
-										
-										
-										img_tensor[count-1,0,:] = torch.from_numpy(img)
-										
-										count+=1
-
-										if(count>0 and not(count%max_f) and self.window_len>0):
-											#print(vid)
-											data_dic[vid+str(count)] = (img_tensor,self.label_to_ix(cl),cl)
-											img_tensor = torch.zeros(max_f,1,self.embed_sz)
-									
-									if(vid+str(max_f) not in data_dic):
-										data_dic[vid+str(max_f)] = (img_tensor,self.label_to_ix(cl),cl,self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/')		
-								
-			### This part for non-zero batch size
+			img_path_list = pickle.load(open(dir_save_path + '/' + str(seq_len) + '_' + phase + '.pkl', 'rb'))
+			if (step_size > 1):
+				new_path_list = [i for i in img_path_list if i[2] % step_size == 0]
 			else:
-				for cl in os.listdir(self.data_dir+'/'+phase+'/'):
+				new_path_list = img_path_list
+			del img_path_list
+			total_num_seq = len(new_path_list)
+			### Now that we loaded all the img paths for each sequence, we arrange various sequences into a minibatch
+			if (truncate):
+				#print(len(new_path_list))
+				total_num_batches = (total_num_seq // batch_size)
+				new_path_list = new_path_list[:total_num_batches * batch_size]
+				#print(len(new_path_list))
 
-					if '.p' not in phase and '.p' not in cl:
-						for vid in os.listdir(self.data_dir+'/'+phase+'/'+cl):
-							if '.p' not in vid:
-								num_frames = len(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid))
-								sorted_frame_names = sorted(os.listdir(self.data_dir+'/'+phase+'/'+cl+'/'+vid),key = lambda s:[int(t) if t.isdigit() else t.lower() for t in re.split('(\d+)',s)])
-									
-								assert self.window_len>=0,"self.window_len should be atleast 0"
+			left_ind = 0
 
-								## setting max seq_len*batches = 15
-								## minimum num of frames in test/train/val = 13 , calculated using check.largest_folder()
-								max_frame_batches = 15
+			right_ind = min(total_num_seq, left_ind + batch_size)
 
+			random.shuffle(new_path_list)
+			while left_ind < len(new_path_list):
+				### Two ways to deal with the last k sequences, one, truncate to multiple of batch_size, two, zero pad.
+				### Trying zero pad.
+				#print(left_ind)
+				#print(right_ind)
+				mini_batch_paths = new_path_list[left_ind:right_ind]
+				### loop to load the images into tensors
+				img_minibatch = torch.zeros((seq_len, batch_size, embed_sz))
+				lab_minibatch = torch.zeros((batch_size))
 
-								if(num_frames<max_frame_batches):
+				mini_batch_idx = 0
+				for sequence_tuple in mini_batch_paths:
+					### Going through the 100 sequences
+					# print(sequence_tuple[0][0])
+					frame_num = 0
+					for img_paths in sequence_tuple[0]:
+						### Now going through the paths of the images in a sequence to fill in the frames of a sequence
 
-									batched_tensor = torch.zeros(self.window_len,self.batch_size,self.embed_sz)
+						img_minibatch[frame_num, mini_batch_idx, :] = torch.from_numpy(torch.load(img_paths))
+						frame_num += 1
+					lab_minibatch[mini_batch_idx] = self.lab_to_ix[sequence_tuple[1]]
 
-									for num in range(0,self.batch_size):
-										count = 0
-										for frame in sorted_frame_names[num*self.window_len:(num+1)*self.window_len]:
-											batched_tensor[count,num,:] = torch.from_numpy(torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame))
-											count+=1
+					mini_batch_idx += 1
 
-									if(vid+str((num+1)*self.window_len)):
-										data_dic[vid+str((num)*self.window_len)] = (batched_tensor,self.label_to_ix(cl),cl,self.data_dir+'/'+phase+'/'+cl+vid+'/')
+				left_ind += batch_size
+				right_ind = min(left_ind + batch_size, len(new_path_list))
 
-								else:
-									num_batches = np.ceil(num_frames/self.window_len)
-
-									# TODO experiment with zero padding instead of windowing in last frames
-									# Posssible TODO - possible image augmentation would be to use moving windows with step=1 rather than step = self.window_len 
-									
-									num_zeros = num_batches*np.ceil(num_frames/self.window_len) - num_frames
-
-									### Batches are divided into 1:self.window_len , when it reaches the remainder it the batch will comprise of the last (self.window_len) number
-									### of frames, with the other two batches being zero vectors. The loss function will be modified to average along this non zero batch only.
-									num_mega_batches = int(num_batches)//self.batch_size
-									for mega_batch_num in range(0,num_mega_batches):
-										batched_tensor = torch.zeros(self.window_len,self.batch_size,self.embed_sz)
-										
-										for num in range(0,self.batch_size):
-											count=0
-											idx1 = int((num+np.ceil(num_mega_batches)*mega_batch_num)*self.window_len)
-											idx2 = int((1+num+np.ceil(num_mega_batches)*mega_batch_num)*self.window_len)
-											for frame in sorted_frame_names[idx1:idx2]:
-												batched_tensor[count,num,:] = torch.from_numpy(torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame))
-												count+=1
-
-										if(vid+str((num+1)*self.window_len)):
-											data_dic[vid+str((num+1)*self.window_len+mega_batch_num*self.window_len)] = (batched_tensor,self.label_to_ix(cl),cl,self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/')
-
-									### taking the last 5 frames and then zero padding rest of the batch
-									if(vid+str(num_frames-self.window_len)):
-										batched_tensor = torch.zeros(self.window_len,self.batch_size,self.embed_sz)
-										count = 0
-										for frame in sorted_frame_names[len(sorted_frame_names)-self.window_len:]:
-											batched_tensor[count,0,:] = torch.from_numpy(torch.load(self.data_dir+'/'+phase+'/'+cl+'/'+vid+'/'+frame))
-											count+=1
-
-										if(vid+str((num+1)*self.window_len)):
-											data_dic[vid+str(len(sorted_frame_names))] = (batched_tensor,self.label_to_ix(cl),cl,self.data_dir+'/'+phase+'/'+cl+vid+'/')
-
-								### Computed based on min frames in train_set. I chose value = highest prime factor, but can be increased.
-
-
-
-			torch.save(data_dic,self.cache_dir.replace('.pth','_')+phase+'.pth')
-			return data_dic
+				### if Truncate set to false then we should use the indices until right_ind for the loss function
+				### TODO Set option for truncate = False, return len(list)%batch_size to be used for loss function averaging.
+				yield img_minibatch, lab_minibatch.long(),sequence_tuple[0]
 			#img_tensor = torch.zeros(max_f,)
 			
 			#for i in os.listdir(self.data_dir):
@@ -219,26 +194,11 @@ def find_2(s):
 	return [i for i,j in enumerate(s) if j=='_'][1]
 
 
+
 def train_net(model_cl,multi=0):
 
-	all_data_dic = {'train':model_cl.load_data('train'),'val':model_cl.load_data('val'),'train_distort_2_16':model_cl.load_data('train_distort_2_16'),'val_distort_2_16':model_cl.load_data('val_distort_2_16')}
-	#all_data_dic2 = {'train':all_data_dic[x] for x in all_data_dic.keys if 'train' in x,'val':all_data_dic[y] for y in all_data_dic.keys() if 'val'}
-    	
-	#os.environ['CUDA_VISIBLE_DEVICES']=str(model_cl.gpu_num)
-	train_data_keys2 = list(all_data_dic['train_distort_2_16'].keys())
-	val_data_keys2 = list(all_data_dic['val_distort_2_16'].keys())
-	train_data_keys = list(all_data_dic['train'].keys())
-	val_data_keys = list(all_data_dic['val'].keys())
-	#print(train_data_keys)
-	#print(val_data_keys)
-    #exit()
-	random.shuffle(train_data_keys)
-	random.shuffle(val_data_keys)
-	random.shuffle(train_data_keys2)
-	random.shuffle(val_data_keys2)
-	data_keys = {'train':train_data_keys,'val':val_data_keys,'train_distort_2_16':train_data_keys2,'val_distort_2_16':val_data_keys2}
 	criterion = nn.NLLLoss().cuda()
-	#print(data_keys['train'])
+
 	if(multi==1):
 
 		model_cl = torch.nn.DataParallel(model_cl,dim=1,device_ids = [0,1,2,3,4,5,6,7]).cuda()
@@ -264,16 +224,16 @@ def train_net(model_cl,multi=0):
 	
 		running_loss_train = 0
 		running_loss_val = 0
-		#print(epoch)
-		#epoch_list.append(epoch)
-		conf_m_vid = np.zeros((model_cl.num_views,model_cl.num_views))
-		conf_m_img = np.zeros_like(conf_m_vid)
+		conf_m_batch = np.zeros((model_cl.num_views,model_cl.num_views))
 		print('model = ', 'layers_'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
 		print('epoch = ',epoch)
+		# for phase in ['train','train_distort_2_16','val','val_distort_2_16']:
+		# for phase in ['val']:
+		train_loader = model_cl.load_data(phase='train',step_size=2)
+		val_loader = model_cl.load_data(phase='val',step_size=2)
+		data_dic ={'train':train_loader,'val':val_loader}
+		for phase in [ 'train','val']:
 
-		
-		for phase in ['train','train_distort_2_16','val','val_distort_2_16']:
-		#for phase in ['val']:
 			print(phase)
 			#if('2_16' in phase):
 			#	print(data_keys[phase])
@@ -282,7 +242,9 @@ def train_net(model_cl,multi=0):
 				model_cl.train(True)
 			else:
 				model_cl.train(False)
-			for keys in data_keys[phase]:
+			data_point_counter = 0
+			running_accuracy=0
+			for tensor,label,names in data_dic[phase]:
 				#print(keys)
 				#print(data_keys[phase])
 
@@ -291,109 +253,88 @@ def train_net(model_cl,multi=0):
 					model_cl.hidden = (model_cl.init_hidden()[0].cuda(async=False),model_cl.init_hidden()[1].cuda(async=False))
 				else:
 					model_cl.hidden = (model_cl.init_hidden()[0].cuda(),model_cl.init_hidden()[1].cuda())
-				#print(all_data_dic[phase].keys())
-				embeds,label,label_name,name_file = all_data_dic[phase][keys]
-				if(label not in num_to_lab):
-					num_to_lab[label.numpy()[0]] = label_name 
-				
-				label = torch.LongTensor(embeds.size(0)).fill_(label[0])
-				
+
 				if('val' in phase):
-					embeds = Variable(embeds.cuda(),volatile=True)
+					embeds = Variable(tensor.cuda(),volatile=True)
 					label = Variable(label.cuda(),volatile = True)
 				else:
-					embeds = Variable(embeds.cuda())
+					embeds = Variable(tensor.cuda())
 					label = Variable(label.cuda())
 				out = model_cl(embeds)
-				
-				loss = criterion(out.view(out.size(0),-1),label)
 
+				loss = criterion(out.view(out.size(0),-1),label)
+				#print(loss)
 				if('train' in phase):
 					loss.backward()
 					running_loss_train+= loss.cpu().data.numpy()[0]
 					op.step()
 				if('val' in phase):
+					### TODO modify accuracy function to get the video wise accuracy,right now use batch wise accuracy.
+
 					running_loss_val+= loss.cpu().data.numpy()[0]
 
 					pred_img,pred_img_idx = out.max(dim=1)
-					#print(pred_img_idx)
-					
+
+					count=0
+
+					#print(pred_img_idx[:10])
+					#print(label.cpu().data[:10])
+					#print(names[:10])
+					#### conf_m_img is the confusion matrix based on the prediction of a sequence, therefore accuracy will be sequence wise accuracy, not image wise.
+
+					running_accuracy += torch.sum(torch.eq(pred_img_idx.cpu().data,label.cpu().data))
+					data_point_counter +=model_cl.batch_size
+					# print(pred_img_idx.cpu().data.size())
+					# print(label.cpu().data.size())
+					# print(running_accuracy)
+					# exit()
 					for pred_img_val in pred_img_idx.cpu().data.numpy().astype(int):
 						#print(pred_img_val)
-						conf_m_img[label.cpu().data[0],pred_img_val]+=1
-					
-
-					if(model_cl.batch_size==1):
-						pred_vid = stats.mode(pred_img_idx.cpu().data.numpy())[0] # This would be the per batch prediction of that video 
-						
-						conf_m_vid[label.cpu().data[0],pred_vid]+=1
-					else:
-						id_pos = find_2(keys)
-						if(keys[:id_pos] not in agg_pred_dic):
-							agg_pred_dic[keys[:id_pos]] = [[],label.cpu().data[0]]
-
-						agg_pred_dic[keys[:id_pos]][0]+= list(pred_img_idx.cpu().data)  
-
-
+						conf_m_batch[label.cpu().data[count],pred_img_val]+=1
+						count+=1
 				del(out)
 				del(loss)
 				del(label)
 				del(embeds)
 
-			if(model_cl.batch_size>1):
-				for item_id in agg_pred_dic:
-					vid_pred = stats.mode(agg_pred_dic[item_id][0])[0][0]
-					actual_lab = agg_pred_dic[item_id][1]
-					conf_m_vid[actual_lab,vid_pred]+=1
-
 			if(epoch not in epoch_list):
 				epoch_list.append(epoch)
 			if('train' in phase):
-				if(count_train_val==0):
-					#all_loss_train.append(running_loss_train)
-					count_train_val+=1
+
+				all_loss_train.append(running_loss_train)
+				count_train_val=0
+				plt.plot(epoch_list,all_loss_train)
+				if(model_cl.batch_size==1):
+					plt.savefig('/data/gabriel/train_loss_rnn/all_data_train_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
 				else:
-					all_loss_train.append(running_loss_train)
-					count_train_val=0
-					plt.plot(epoch_list,all_loss_train)
-					if(model_cl.batch_size==1):
-						plt.savefig('/data/gabriel/train_loss_rnn/all_data_train_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
-					else:
-						plt.savefig('/data/gabriel/train_loss_rnn/batch/all_data_train_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
-					plt.close()
+					plt.savefig('/data/gabriel/train_loss_rnn/batch/all_data_train_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
+				plt.close()
 				#pickle.dump(all_loss_val,open('/data/gabriel/train_val_loss_rnn/train_val_loss_rnn/new_val_hidden_dim_'+str(model_cl.layers)+'_loss.pkl','wb'))
 			else:
-				if(count_train_val==0):
-					#all_loss_val.append(running_loss_val)
-					count_train_val+=1
+				# if(count_train_val==0):
+				# 	#all_loss_val.append(running_loss_val)
+				# 	count_train_val+=1
+				# else:
+				all_loss_val.append(running_loss_val)
+				#vid_acc = conf_m_vid.diagonal().sum()/conf_m_vid.sum()
+				print('sequence accuracy =',running_accuracy/data_point_counter)
+				img_acc = conf_m_batch.diagonal().sum()/conf_m_batch.sum()
+				#print('video accuracy =',vid_acc)
+				print('sequence accuracy =',img_acc)
+				count_train_val=0
+				#print(epoch_list)
+				#print(all_loss_val)
+				if(img_acc >= best_val_acc):
+					best_val_acc = img_acc
+					best_model = model_cl
+
+				plt.plot(epoch_list,all_loss_val)
+				if(model_cl.batch_size==1):
+					plt.savefig('/data/gabriel/train_loss_rnn/all_data_val_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
 				else:
-					all_loss_val.append(running_loss_val)
-					vid_acc = conf_m_vid.diagonal().sum()/conf_m_vid.sum()
-					img_acc = conf_m_img.diagonal().sum()/conf_m_img.sum()
-					print('video accuracy =',vid_acc)
-					print('image accuracy =',img_acc)
-					count_train_val=0
-					#print(epoch_list)
-					#print(all_loss_val)
-					if(img_acc >= best_val_acc):
-						best_val_acc = img_acc
-						best_model = model_cl
+					plt.savefig('/data/gabriel/train_loss_rnn/batch/all_data_val_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
 
-					plt.plot(epoch_list,all_loss_val)
-					if(model_cl.batch_size==1):
-						plt.savefig('/data/gabriel/train_loss_rnn/all_data_val_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
-					else:
-						plt.savefig('/data/gabriel/train_loss_rnn/batch/all_data_val_bneck_pre_l'+str(model_cl.layers)+'_hd_'+str(model_cl.hidden_dim)+'_dr_'+str(model_cl.dropout)+'batch_'+str(model_cl.batch_size)+'_loss.png')
-
-					plt.close()
-
-
-		random.shuffle(train_data_keys)
-		random.shuffle(val_data_keys)
-		random.shuffle(train_data_keys2)
-		random.shuffle(val_data_keys2)
-		data_keys = {'train':train_data_keys,'val':val_data_keys,'train_distort_2_16':train_data_keys2,'val_distort_2_16':val_data_keys2}
-
+				plt.close()
 
 	pickle.dump(all_loss_val,open('all_data_val_'+str(model_cl.layers)+'_'+str(model_cl.lr)+'_loss.pkl','wb'))
 
@@ -401,7 +342,7 @@ def train_net(model_cl,multi=0):
 	pickle.dump(all_loss_train,open('all_data_train_'+str(model_cl.layers)+'_'+str(model_cl.lr)+'_loss.pkl','wb'))
 
 
-	return model_cl,op,num_to_lab
+	return model_cl,op#,num_to_lab
 import os
 
 
@@ -412,8 +353,8 @@ def test(model_cl,res_dir,test_class='test'):
 	if(not os.path.exists(res_dir)):
 		os.makedirs(res_dir)
 	#os.environ['CUDA_VISIBLE_DEVICES']=str(model_cl.gpu_num)
-	test_dic = {str(test_class):model_cl.load_data(test_class)}
-	test_data_keys = list(test_dic[test_class].keys())
+	test_dic = {str(test_class):model_cl.load_data(phase=test_class)}
+	#test_data_keys = list(test_dic[test_class].keys())
 	model_cl.eval()
 	model_cl = model_cl.cuda()
 	
@@ -424,80 +365,35 @@ def test(model_cl,res_dir,test_class='test'):
 
 
 	conf_m_vid = np.zeros((model_cl.num_views,model_cl.num_views))
-	conf_m_img = np.zeros_like(conf_m_vid)
+	#conf_m_img = np.zeros_like(conf_m_vid)
 
 	misc_cl = {}
 	agg_pred_dic = {}
-	for keys in test_data_keys:
-		#print(keys)
-		embeds,label,label_name,name_file = test_dic[test_class][keys]
 
-		embeds = Variable(embeds.cuda())
-		
-		ac_label = label[0]
-				
-		label = torch.FloatTensor(embeds.size(0)).fill_(label[0])
-		#label = Variable(label.cuda())
-		#print(label)
+	for img_tensor,label_tensor,name_of_imgs in test_data_keys:
+		#print(keys)
+		#embeds,label,label_name,name_file = test_dic[test_class][keys]
+
+		embeds = Variable(img_tensor.cuda())
+		label = Variable(label_tensor.cuda())
+
 		out = model_cl(embeds)
-		#print(out)
+
 		out_cpu = out.cpu()
 		_,pred_lab = torch.max(out_cpu.data,1)
-		#print(pred_lab)
-		#print(pred_lab)
+
+		# pred_lab and label_tensor are the predictions and ground truth for the batch_size
+
 		for i in range(0,pred_lab.size(0)):
-			# print(type(i))
-			# print(type(label[i]))
-			# print(type(pred_lab[i]))
-			#print(type(pred_lab[i]))
-			#print(pred_lab[i][0])
+
+			### Sequence accuracy.
 			conf_m_img[label.numpy().astype(int)[i],pred_lab[i]]+=1
-
-		#print(pred_vid)
-		#print(pred_lab)
-		#print(ac_label)
-		#print(pred_vid[0])
-		if(model_cl.batch_size==1):
-			pred_vid = stats.mode(pred_lab.numpy(),axis=None)
-			
-			conf_m_vid[ac_label,pred_vid[0][0]]+=1
-			if(pred_vid[0]!=ac_label):
-				# print(pred_vid[0])
-				# print(ac_label)
-				misc_cl[keys] = [model_cl.labels[pred_vid[0][0]],model_cl.labels[int(ac_label)]]
-
-		else:
-			id_pos = find_2(keys)
-			if(keys[:id_pos] not in agg_pred_dic):
-				agg_pred_dic[keys[:id_pos]] = [[],[]]
-
-			# print('pred')
-			# print(pred_lab)
-			# print('lab')
-			# print(label)
-			agg_pred_dic[keys[:id_pos]][0]+= list(pred_lab)  
-			agg_pred_dic[keys[:id_pos]][1]+= list(label)  
-
-			
-			### format is --- 'video_numframes -- > predicted label , actual label'
-
-		#exit()
-		#is_eq =	torch.eq(pred_lab,out_cpu.data).numpy()
-
-		#img_acc+=torch.sum(torch.eq(label,out_cpu.data))
-	#print(agg_pred_dic)
-	if(model_cl.batch_size>1):
-
-		for item_id in agg_pred_dic:
-			vid_pred = stats.mode(agg_pred_dic[item_id][0])[0][0]
-			actual_lab = agg_pred_dic[item_id][1][0]
-			
-			#print(actual_lab)
-			conf_m_vid[int(actual_lab),int(vid_pred)]+=1
+			actual_lab = pred_lab[i]
+			seq_pred = label.numpy().astype(int)[i]
 			if(vid_pred!=actual_lab):
 				# print(pred_vid[0])
 				# print(ac_label)
-				misc_cl[item_id] = [model_cl.labels[vid_pred],model_cl.labels[int(actual_lab)]]
+				misc_cl[tuple(name_of_imgs)] = [model_cl.labels[vid_pred],model_cl.labels[int(actual_lab)]]
 
 	m_name = res_dir[res_dir.find('s_lstm'):res_dir.find('.pth')]
 	#print(res_dir)
@@ -511,6 +407,6 @@ def test(model_cl,res_dir,test_class='test'):
 	print(conf_m_img)
 	print(misc_cl)
 
-	print('video accuracy = ',conf_m_vid.diagonal().sum()/conf_m_vid.sum())
+	#print('video accuracy = ',conf_m_vid.diagonal().sum()/conf_m_vid.sum())
 	print('image accuracy = ',conf_m_img.diagonal().sum()/conf_m_img.sum())
 	
